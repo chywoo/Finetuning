@@ -1,7 +1,7 @@
 # Fine-tuning 실습 프로젝트 작업 기록
 
 기록일: 2026-10-02 (America/Toronto)  
-작업 위치: `/Volumes/work/finetune`  
+작업 위치: 프로젝트 루트
 최초 현황: **9개 실습 디렉토리의 코드·문서·데이터 및 DGX Spark 실행 구성을 작성한 상태. 최신 구성의 Spark CUDA 실행 검증은 미실시.** 이후 post-training을 포함한 현재 범위와 상태는 9절 및 실습 체크리스트에서 관리한다.
 
 이 기록은 현재까지의 진행 상황을 정리한다. 파일 작성 완료와 실제 GPU 동작 확인을 구분하며, 학습 성능 향상을 확인한 것으로 해석하지 않는다.
@@ -240,7 +240,7 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - 모든 하위 작업자가 완료 상태임을 확인했다. 새 구현 작업을 위임하거나 재개하지 않았다.
 - Git 상태: 저장소의 main branch가 존재하지만 아직 commit이 없다. 현재 코드·교육 문서·실습 계획의 초기 스냅샷을 Conventional Commit으로 기록한다.
 - Git 기록에서 outputs·Spark 가상환경을 제외하도록 ignore를 보강했다. 기존 ignore의 data/cache/Graft 제외는 유지한다. 내려받은 데이터와 로컬 모델은 작업 공간에 있으며, 데이터 준비 스크립트와 설명은 commit 대상이다.
-- Commit 전 읽기 전용 확인: 소스/문서에서 일반적인 API token/private key 패턴 검출 없음. 이전 정적 리뷰 결과와 CUDA/coverage 미확인 상태를 기록한다. Intel Mac의 환경 감사·ML import·pytest·학습은 실행하지 않는다.
+- Commit 전 읽기 전용 확인: 소스·문서의 민감정보 노출 가능성을 점검했다. 이전 정적 리뷰 결과와 CUDA/coverage 미확인 상태를 기록한다. Intel Mac의 환경 감사·ML import·pytest·학습은 실행하지 않는다.
 - 초기 스냅샷 commit 제목: `feat: add staged fine-tuning and post-training learning lab`. 이 commit은 중단 전에 작성된 결과와 현재 문서를 기록하며 구현 재개가 아니다.
 - 이후에는 각 주요 계획/문서 작업 종료 시 변경 검토→local commit→시각별 이력 기록을 진행한다. Push·원격 작업은 실행하지 않는다.
 
@@ -251,3 +251,10 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - Commit 직후 `git status --short`는 비어 있었다. 원격 push는 실행하지 않았다.
 - 구현 중단 상태를 유지한다. 이번 요청 후에는 실행 코드·테스트 구현을 변경하지 않았으며, 현재 작업은 운영 규칙·문서·Git 기록 정리다.
 - 이 완료 이력을 별도 문서 commit(`docs: record initial milestone commit`)으로 기록한다. 해당 commit 자체의 hash는 `git log`에서 확인한다.
+
+### 2026-10-02 10:49:48 EDT — Skill 설치 및 기록 민감정보 정비
+
+- 저장소 지침에서 요구한 ECC skills를 설치했다: `mle-workflow`, `pytorch-patterns`, `python-patterns`, `python-testing`, `eval-harness`, `codebase-onboarding`, `code-tour`.
+- 작업 위치 표기를 특정 내부 절대 경로 대신 `프로젝트 루트`로 정정했다.
+- 기존 기록의 민감정보 점검 문구를 일반화했으며, 내부 장비 식별 정보나 비밀 값은 기록하지 않는다.
+- 이번 작업은 skill 설치와 문서 기록 정비만 포함하며, 구현·테스트·다운로드·학습은 실행하지 않았다.
