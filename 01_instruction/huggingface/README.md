@@ -6,9 +6,9 @@
 
 주 경로는 PyTorch full(I1) → HF LoRA(I4) → [Domain 수업](../../04_post_training/domain_huggingface/README.md)입니다. 다른 full/QLoRA/Unsloth 조합은 주 경로를 마친 뒤 선택 비교합니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
-이 실습에서는 **instruction tuning 이전의 base 모델**에 지시문과 모범 응답을 학습시킵니다. 기본 모델은 `HuggingFaceTB/SmolLM2-135M`입니다. 모델 이름 끝의 `-Instruct`가 없는 것을 확인하세요. 실행 대상은 **DGX Spark의 ARM64 Linux + NVIDIA CUDA GPU**입니다. 135M은 첫 실습 비용을 낮추기 위한 선택이며, 20 step 학습은 파이프라인 확인용입니다. 사용 가능한 챗봇을 만드는 데 필요한 데이터 품질·다양성·평가를 대신하지 않습니다.
+이 실습에서는 **instruction tuning 이전의 base 모델**에 지시문과 모범 응답을 학습시킵니다. 기본 모델은 `HuggingFaceTB/SmolLM2-135M`입니다. 모델 이름 끝의 `-Instruct`가 없는 것을 확인하세요. PyTorch/HF full·LoRA는 일반 Linux CUDA 환경을 권장하며 작은 CPU 실습도 가능합니다. 135M은 첫 실습 비용을 낮추기 위한 선택이며, 20 step 학습은 파이프라인 확인용입니다. 사용 가능한 챗봇을 만드는 데 필요한 데이터 품질·다양성·평가를 대신하지 않습니다.
 
 [공식 모델 카드](https://huggingface.co/HuggingFaceTB/SmolLM2-135M)에 따르면 이 모델은 Apache 2.0 라이선스의 주로 영어를 다루는 모델입니다. 설명은 한국어로 읽고, 기본 데이터 실습은 영어로 진행합니다. 한국어를 연습하려면 한국어 기반 모델과 한국어 지시 데이터를 함께 선택해야 합니다.
 
@@ -42,8 +42,8 @@ Hugging Face는 학습 도구이며 LoRA는 파라미터를 업데이트하는 �
 
 | `--method` | 업데이트하는 값 | 저장 결과 | 이 실습의 실행 환경 |
 |---|---|---|---|
-| `full` | 기존 가중치 전체 | 전체 모델 | DGX Spark CUDA |
-| `lora` 기본값 | 작은 LoRA 행렬 | adapter + tokenizer | DGX Spark CUDA |
+| `full` | 기존 가중치 전체 | 전체 모델 | PyTorch 지원 CPU/CUDA |
+| `lora` 기본값 | 작은 LoRA 행렬 | adapter + tokenizer | PyTorch 지원 CPU/CUDA |
 | `qlora` | 4-bit base에 추가한 LoRA 행렬 | adapter + tokenizer | NVIDIA CUDA + bitsandbytes |
 
 LoRA는 선형층 `W`를 고정하고 `W + (alpha/r) BA`를 사용합니다. `A`와 `B`의 rank `r`이 작으므로 학습할 파라미터와 optimizer 상태가 줄어듭니다. 이 구현은 `target_modules="all-linear"`, `r=8`, `alpha=16`, dropout 0.05를 사용합니다. [LoRA 원 논문](https://arxiv.org/abs/2106.09685).
@@ -64,14 +64,10 @@ QLoRA는 base 가중치를 NF4 4-bit로 읽고 LoRA 행렬을 학습합니다. �
 
 ## 4. 순서대로 실행하기
 
-아래 명령은 DGX Spark의 저장소 루트에서 실행합니다. 먼저 [DGX Spark 환경 안내](../../docs/04_dgx_spark.md)에 따라 컨테이너를 시작하고 의존성을 설치합니다. `requirements/spark-hf.txt`는 NVIDIA 이미지에 있는 PyTorch를 유지하며 Hugging Face 의존성을 추가합니다.
+일반 환경은 [빠른 시작](../../docs/00_quickstart.md)의 `.venv-lab`과 `requirements/lab-hf.txt`를 준비합니다. 아래 명령은 프로젝트 루트에서 실행합니다. 작은 텍스트 full·LoRA는 CPU에서도 가능하며, VLM은 모델 크기와 processor 메모리를 확인하고 CUDA를 권장합니다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay를 선택합니다.
 
 ```bash
-# DGX Spark host에서 실행
-bash scripts/spark_container.sh hf
-# 열린 컨테이너 안에서 실행
-bash scripts/install_spark.sh hf
-source .venv-spark-hf/bin/activate
+source .venv-lab/bin/activate
 python -c "import torch; print(torch.__version__, torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
 ```
 
@@ -98,7 +94,7 @@ python -m finetune_lab.evaluate --device cuda --model HuggingFaceTB/SmolLM2-135M
 CUDA_VISIBLE_DEVICES=0 python 01_instruction/huggingface/train.py --method lora --device cuda --max-steps 20 --output-dir outputs/instruction_hf_lora
 ```
 
-Spark에서는 `--device cuda`를 명시합니다. CUDA를 사용할 수 없는 환경에서는 오류로 종료하여 잘못된 환경을 바로 확인할 수 있습니다. 기본 batch 1 × accumulation 4로 한 번의 optimizer update에 여러 microbatch를 모읍니다. `max-steps`는 optimizer update 수입니다.
+CUDA 환경에서는 `--device cuda`를 명시합니다. CUDA를 사용할 수 없는 환경에서는 오류로 종료하여 잘못된 환경을 바로 확인할 수 있습니다. 기본 batch 1 × accumulation 4로 한 번의 optimizer update에 여러 microbatch를 모읍니다. `max-steps`는 optimizer update 수입니다.
 
 학습 전후 validation loss를 같은 과정에서 측정합니다. 각 forward의 loss가 NaN/Inf이면 바로 실패하여 잘못된 결과가 정상 모델처럼 저장되지 않도록 합니다. 학습 동안 Hub 업로드나 외부 실험 추적 서비스 전송은 사용하지 않습니다.
 
@@ -137,15 +133,15 @@ python 01_instruction/huggingface/train.py --data-dir data/demo/instruction --dr
 CUDA_VISIBLE_DEVICES=0 python 01_instruction/huggingface/train.py --data-dir data/demo/instruction --smoke-model --method full --device cuda --max-steps 2 --max-length 64 --gradient-accumulation 1 --output-dir outputs/instruction_hf_smoke
 ```
 
-demo 데이터는 프로젝트에서 만든 작은 예시이며, `--smoke-model`은 임의 초기화한 작은 모델입니다. Spark에서 이 실험으로 tokenization → CUDA loss → optimizer → 저장을 검사합니다. 사전학습 모델에 instruction 능력을 추가했다는 결과로 해석하면 안 됩니다. Spark CUDA 실행 결과와 coverage 80% 달성은 아직 확인되지 않았습니다. 실행·검증 명령은 Spark에서 수행해야 합니다.
+demo 데이터는 자체 작성 예시이고, `--smoke-model`은 임의 초기화한 작은 모델입니다. 이 실험은 tokenization → loss → optimizer → 저장을 검사하는 학습입니다. 사전학습 모델에 instruction 능력을 추가한 결과로 해석하면 안 됩니다. 실제 실행·coverage 상태는 [검증 기록](../../docs/07_validation.md)을 확인합니다.
 
-Spark에서 학습·adapter 재로드·generation 통합 테스트를 실행하려면 다음 명령을 사용합니다.
+지원 CUDA 환경에서 학습·adapter 재로드·generation 통합 테스트를 실행하려면 다음 명령을 사용합니다. 학습 실행을 허용한 경우에만 실행합니다.
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 RUN_ML_TESTS=1 python -m unittest discover -s tests -p test_hf_text.py
 ```
 
-통합 테스트는 기본 CUDA 장치를 사용하며 CUDA가 없으면 실패합니다. 전체 테스트와 coverage 문턱은 Spark 환경 문서의 검증 명령을 따르세요. `training_metadata.json`의 `runtime`에는 Python/패키지 버전, CUDA 버전, GPU 이름과 capability가 저장됩니다.
+통합 테스트는 기본 CUDA 장치를 사용하며 CUDA가 없으면 실패합니다. 전체 테스트와 coverage 기준은 [검증 안내](../../docs/07_validation.md)를 따릅니다. `training_metadata.json`에는 재현에 필요한 Python/패키지·CUDA 버전을 남기며 내부 장비 식별 정보나 비밀 값은 기록하지 않습니다.
 
 ## 7. 결과를 읽고 확장하기
 
@@ -157,8 +153,17 @@ CUDA_VISIBLE_DEVICES=0 RUN_ML_TESTS=1 python -m unittest discover -s tests -p te
 | 긴 지시를 무시함 | prompt 왼쪽 truncation | max-length 증가, 데이터 길이 제한 |
 | 메모리 부족 | 긴 sequence, optimizer/activation | max-length와 batch 감소, LoRA 선택 |
 
-학습률, rank, 데이터 수, step 수 중 한 가지씩 변경하고 같은 test를 비교하세요. `--max-steps 200 --max-length 512`처럼 점진적으로 늘리되, validation loss와 기존 능력의 변화도 기록합니다. seed를 고정해도 하드웨어·라이브러리에 따라 완전히 같은 결과가 보장되지는 않습니다.
+학습률, rank, 데이터 수, step 수 중 한 가지씩 변경하고 같은 validation을 비교하세요. 설정을 고른 뒤 test를 최종 평가에 사용합니다. `--max-steps 200 --max-length 512`처럼 점진적으로 늘리되, validation loss와 기존 능력의 변화도 기록합니다. seed를 고정해도 하드웨어·라이브러리에 따라 완전히 같은 결과가 보장되지는 않습니다.
 
 재현 가능한 실험에서는 `--revision main` 대신 모델 commit SHA를 지정합니다. 데이터 준비의 `--revision`도 별도로 고정하세요. 커스텀 데이터는 같은 JSONL schema와 세 split을 만든 뒤 `--data-dir`로 지정하면 됩니다.
 
 TRL의 [`SFTTrainer`](https://huggingface.co/docs/trl/sft_trainer)는 prompt/completion, 대화 데이터, packing 등 SFT에 특화된 기능을 제공합니다. 이 실습은 명시적인 labels와 Transformers `Trainer`를 사용해 PyTorch 폴더와 loss를 비교하기 쉽게 만들었습니다. TRL로 옮길 때는 라이브러리 버전에 맞는 completion-only loss와 chat template 설정을 확인하고, 동일한 label 범위가 실제로 적용되는지 검사하세요.
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: 동일 validation의 response loss와 생성 답변을 비교하고 지시 준수·관련성·정확성·종료를 읽어 설명합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. 다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

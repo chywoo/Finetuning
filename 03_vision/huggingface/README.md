@@ -6,7 +6,7 @@
 
 Post-training의 확률/loss·보상 수업을 마친 뒤 PyTorch V1 → HF V2 순으로 진행합니다. Unsloth V3는 다른 모델을 사용하는 선택 확장입니다. 완료하면 [추가 비교 과제](../../docs/08_next_experiments.md)로 이동합니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
 이미지와 질문을 입력받는 `HuggingFaceTB/SmolVLM-256M-Instruct`를
 콩 잎 상태의 문자열을 생성하도록 적응시킨다. `angular_leaf_spot`,
@@ -59,13 +59,7 @@ HF 준비 명령은 공식 split을 유지한 작은 부분집합을 이미지 �
 
 ## 3. 실제 진행
 
-**DGX Spark의 ARM64/CUDA PyTorch 컨테이너**를 준비하고 저장소 최상위
-디렉토리에서 아래 순서로 실행한다. GB10을 지원하는 NGC 컨테이너 사용법은
-[공통 DGX Spark 환경 문서](../../docs/04_dgx_spark.md)를 따른다. 호스트에서
-`bash scripts/spark_container.sh hf`로 컨테이너를 열고 안에서
-`bash scripts/install_spark.sh hf`를 실행한다.
-설치 후 `source .venv-spark-hf/bin/activate`로 환경을 활성화한다.
-컨테이너의 CUDA PyTorch를 일반 pip wheel로 바꾸지 않는다.
+일반 환경은 [빠른 시작](../../docs/00_quickstart.md)의 `.venv-lab`과 `requirements/lab-hf.txt`를 준비합니다. 아래 명령은 프로젝트 루트에서 실행합니다. 작은 텍스트 full·LoRA는 CPU에서도 가능하며, VLM은 모델 크기와 processor 메모리를 확인하고 CUDA를 권장합니다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay를 선택합니다.
 작은 batch와 적은 step으로 입출력과 저장·재로드부터 확인한다.
 
 ```bash
@@ -91,7 +85,7 @@ python 03_vision/huggingface/train.py --evaluate --device cuda \
 
 `--max-steps 20`은 optimizer 업데이트 20회다. batch 1, accumulation 4에서는
 약 80회 이미지 입력을 처리한다. 짧은 smoke run으로 정확도 개선을 보장하지 않는다.
-`--device cuda`를 명시해 DGX Spark의 GPU를 사용한다. CUDA에서는 하드웨어에
+`--device cuda`를 명시해 CUDA GPU를 사용한다. CUDA에서는 하드웨어에
 따라 bf16/fp16 AMP를 사용하며 기본 가중치는 float32로 로드한다.
 학습 시작 시 출력되는 trainable parameter 수로 예상한 adapter만 학습하는지 확인한다.
 
@@ -149,3 +143,12 @@ Loss 개선과 실제 이미지 분류 개선이 항상 함께 움직이지는 �
 - Rank·학습률을 바꿀 때 한 번에 한 변수만 바꾼다. 설정마다 출력 폴더를 바꿔 보관한다.
 - 이미지 배경만 보고 예측하는지, 새로운 촬영 조건에서도 맞추는지 별도 사진으로 확인한다.
 - 잎 사진 외의 일반 이미지 질문에서도 원래 응답 능력이 유지되는지 기록한다.
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: 동일 이미지와 prompt의 accuracy·macro-F1·invalid 출력 및 클래스별 오분류를 비교합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. 다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

@@ -2,6 +2,8 @@
 
 ## 현재 상태
 
+최종 구현·교육 보완 및 빠른 검증은 [구축 완료와 실행 범위](13_readiness.md)를 기준으로 합니다. **172 passed, 학습 integration 2 skipped, 전체 coverage 81.56%**입니다. 아래 시간별 검사는 이전 시점의 이력이며, 최초 미설치 의존성은 별도 `.venv-lab`에 준비했습니다. Unsloth runtime 충돌과 공급 wheel tag 경고는 완료 문서에 구분했습니다.
+
 새 post-training 범위는 [실습 계획](11_curriculum.md)과 [체크리스트](10_practice_checklist.md)의 P1–P4를 따른다. Domain은 기존 HF CPT/QA 경로를 재사용한다. DPO/Reward/PPO/GRPO는 post overlay에서 각각 학습·저장·별도 재로딩·독립 평가를 실행해야 하며, 아래 기존 HF/Unsloth matrix에 포함된 것으로 표시하지 않는다.
 
 사용자 지시로 환경 준비 검토와 짧은 동작 검사를 재개했습니다. 모델 학습과 오래 걸리는 작업은 실행하지 않습니다. 최초 검사에서 없었던 `data/processed/`와 demo 데이터를 사용자가 복사했으며, 아래 재검사로 현재 데이터 가용성을 확인했습니다. 전체 의존성과 학습 실행 검증은 아직 미완료입니다.
@@ -71,6 +73,6 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 
 ## Coverage 기준
 
-제공된 AGENTS.md의 목표는 80% 이상입니다. 현재 **전체 coverage 80% 달성은 미확인**이며 gate 명령은 기준 미달 시 실패합니다. CUDA/Unsloth의 mock tests는 제어 흐름 검사에 도움을 주지만 실제 GPU kernel 실행을 대신하지 않습니다. HF와 Unsloth를 한 프로세스에서 섞지 않고 profile별 실행 결과를 기록합니다.
+제공된 AGENTS.md의 목표는 80% 이상입니다. 최종 빠른 suite의 **전체 branch 포함 coverage 81.56%**를 확인했으며 gate 종료 코드는 0입니다. 학습 integration 2개는 명시적으로 비활성화했고, mock tests와 임의 초기화 모델 검사는 native kernel·실제 모델 품질 검증을 대신하지 않습니다. HF와 Unsloth를 한 프로세스에서 섞지 않고 profile별 실행 결과를 기록합니다.
 
 GPU 검증 결과를 받으면 실행 환경 image digest·freeze·logs를 남기고 이 문서를 갱신합니다. 통과하지 않은 항목을 완료로 표시하거나 exception coverage로 감추지 않습니다.

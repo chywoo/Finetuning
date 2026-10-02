@@ -2,7 +2,7 @@
 
 이 문서는 고등학교 수준의 수학과 짧은 Python 예제로 fine-tuning의 한 바퀴를 이해하는 수업이다. 먼저 **입력 → 다음 토큰의 확률 → 정답과 비교 → 가중치 수정 → 다시 확인**이라는 흐름을 잡는다.
 큰 모델의 구조와 미분 공식을 전부 외우기 전에, 학습 명령의 숫자가 무엇을 뜻하는지 설명할 수 있으면 된다.
-이 저장소의 실제 학습은 DGX Spark에서 진행한다. 아래 출력 숫자는 설명용 예시이며 Spark에서 측정한 결과가 아니다.
+이 저장소는 특정 장비 전용이 아니다. 아래 출력 숫자는 설명용 예시이며 실제 실행 측정값이 아니다.
 
 ## 1. 이번에는 어디까지 공부할까?
 
@@ -217,26 +217,23 @@ Adapter만으로는 원래 모델 전체가 없으므로 **같은 base 모델의
 정확히 중단 지점부터 학습을 이어가려면 optimizer·진행 상태 등도 필요하다. 모델 파일 저장만으로 완전한 resume가 보장되지는 않는다.
 이 저장소의 metadata와 데이터 manifest는 어느 설정과 데이터로 만들었는지 추적하는 기록이다.
 
-## 11. DGX Spark에서 명령을 읽는 방법
+## 11. 실습 환경에서 명령을 읽는 방법
 
-호스트는 DGX Spark의 원래 Linux 환경이고, 컨테이너는 그 안에서 실행하는 별도 소프트웨어 환경이다. GPU는 CUDA를 통해 계산에 사용한다. 이 저장소는 Spark의 ARM64와 GPU에 맞는 NVIDIA 컨테이너를 사용한다.
-컨테이너를 실행할 때 저장소 폴더를 연결하므로 컨테이너 안의 `/workspace/finetune`에서 같은 코드와 데이터를 읽는다.
-자세한 설치는 [DGX Spark 안내](04_dgx_spark.md)를 따른다. 실제 학습 명령은 Spark에서 실행한다.
+가상환경은 프로젝트에 필요한 Python 패키지를 분리한다. CUDA는 NVIDIA GPU에서 계산하는 경로이며, CPU와 GPU는 사용하는 장치가 다르다. [빠른 시작](00_quickstart.md)에서 장치에 맞는 PyTorch와 고정 버전 라이브러리를 준비한다. 모든 명령은 프로젝트 루트에서 실행한다.
 
 ```bash
-# Spark 호스트의 저장소 폴더에서 컨테이너 시작
-bash scripts/spark_container.sh hf
-# 열린 컨테이너 안에서 설치하고 Python 환경 활성화
-bash scripts/install_spark.sh hf
-source .venv-spark-hf/bin/activate
+source .venv-lab/bin/activate
+python scripts/doctor.py
+python 01_instruction/pytorch/train.py --dry-run
 ```
 
-컨테이너와 가상환경은 다르다. 컨테이너는 CUDA 등 시스템 환경을 제공하고, 활성화한 가상환경은 Python 패키지 선택을 맞춘다.
-활성화 후의 `python` 명령이 실습용 환경을 사용하도록 한다. 이 첫 수업에서는 HF/PyTorch profile 하나로 진행한다.
+활성화 후의 `python`이 실습 환경을 사용하도록 한다. Dry-run은 데이터 확인이며 가중치를 바꾸지 않는다. 작은 PyTorch/HF 텍스트 full·LoRA 실습은 CPU도 가능하지만 실제 학습은 CUDA를 권장한다. QLoRA·Unsloth·post-training은 별도 GPU 지원 조건이 있다.
+
+컨테이너는 CUDA 같은 시스템 환경까지 묶고, 가상환경은 Python 패키지를 분리한다. DGX Spark 사용자는 [전용 환경 안내](04_dgx_spark.md)의 컨테이너 안에서 실습 환경을 활성화한다. 이 선택 환경의 설치 절차를 일반 CPU/CUDA 환경에 그대로 적용하지 않는다.
 
 ## 12. 첫 실행에서 무엇을 기대해야 할까?
 
-[빠른 시작](00_quickstart.md)을 따라 demo 데이터를 준비한 뒤, 아래 명령을 컨테이너에서 실행한다.
+[빠른 시작](00_quickstart.md)을 따라 demo 데이터를 준비한 뒤, 아래 명령을 활성화한 실습 환경에서 실행한다. 마지막 `--smoke-model` 명령은 학습이므로 환경 확인만 할 때는 실행하지 않는다.
 이미 `data/demo/instruction`이 준비되어 있다면 첫 데이터 준비 명령은 건너뛰고 기존 파일을 사용한다.
 
 ```bash
@@ -296,4 +293,4 @@ LoRA의 `W' = W + (α/r)BA`에서는 `W`가 고정된 원래 행렬이고 `A`, `
 - 정답 5: 안 된다. 실제 EOS는 종료 학습에 사용하고 길이 맞춤용 padding 위치만 제외한다.
 - 정답 6: 아니다. 외운 예제에서 좋아져도 새로운 문제에서 나빠질 수 있으므로 분리해서 평가한다.
 - 정답 7: 아니다. 동일한 원래 모델과 revision, adapter, tokenizer를 함께 읽어야 재현할 수 있다.
-- 정답 8: 아니다. 두 점검의 범위는 다르며 실제 base 모델의 Spark 학습과 전후 평가가 따로 필요하다.
+- 정답 8: 아니다. 두 점검의 범위는 다르며 실제 base 모델의 학습과 전후 평가가 따로 필요하다.

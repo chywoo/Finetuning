@@ -1,6 +1,6 @@
 # RLHF의 구조 실습: 선호 데이터 → reward model → PPO
 
-이 실습은 **좋은 답변을 채점하는 모델을 먼저 학습하고, 그 점수를 이용해 답변 모델을 개선**합니다. DGX Spark ARM64 Linux/CUDA에서 Hugging Face Transformers와 **TRL 0.24.0**을 사용합니다. 주 학습 경로의 출발점은 아래 선수 과정에서 만든 **`outputs/preference_sft_full` SFT checkpoint**입니다. 기존 `HuggingFaceTB/SmolLM2-135M-Instruct`는 reward/PPO 단계만 분리하여 확인하는 선택지입니다.
+이 실습은 **좋은 답변을 채점하는 모델을 먼저 학습하고, 그 점수를 이용해 답변 모델을 개선**합니다. BF16 지원 Linux CUDA 환경에서 Hugging Face Transformers와 **TRL 0.24.0**을 사용합니다. 주 학습 경로의 출발점은 아래 선수 과정에서 만든 **`outputs/preference_sft_full` SFT checkpoint**입니다. 기존 `HuggingFaceTB/SmolLM2-135M-Instruct`는 reward/PPO 단계만 분리하여 확인하는 선택지입니다.
 
 프로젝트의 기본 선호 데이터는 사람이 실제로 채점한 기록이 아니라 **작성한 synthetic 예제**입니다. 따라서 이것은 RLHF의 reward-model/PPO 계산 과정을 학습하는 실습이며, 실제 human-feedback RLHF 실험을 재현했다는 결과로 해석하면 안 됩니다. 실제 RLHF를 하려면 평가 기준을 정하고 사람에게 동일 prompt의 여러 응답을 비교하게 하여 선호 데이터를 수집해야 합니다.
 
@@ -107,21 +107,19 @@ PPO에는 **prompt prefix만** 전달하고 응답은 policy가 새로 생성합
 
 PPO의 reward pooling은 padding 위치를 읽기 때문에 **PAD와 EOS가 같으면 안 됩니다**. 코드에서 필요한 경우 별도 PAD를 추가하고 네 모델 모두의 embedding 크기를 맞춥니다. RM tokenizer를 함께 저장하고, PPO와 평가에서 이 tokenizer를 재사용합니다. 너무 긴 pair와 prompt는 조용히 제거하거나 자르지 않고 오류로 안내합니다.
 
-## 5. DGX Spark 환경
+## 5. 실행 환경
 
-먼저 [Spark 설치 안내](../../docs/04_dgx_spark.md)에서 NVIDIA ARM64 CUDA 컨테이너를 준비합니다. post-training overlay는 `requirements/spark-post.txt`이며 NVIDIA 이미지의 PyTorch를 덮어 설치하지 않습니다.
+먼저 [빠른 시작](../../docs/00_quickstart.md)의 일반 환경과 단일 BF16 CUDA 장치를 준비합니다. Spark를 선택한 경우에만 [전용 안내](../../docs/04_dgx_spark.md)의 `requirements/spark-post.txt` NGC overlay를 사용합니다.
 
 ```bash
-# DGX Spark host에서 저장소 root로 이동 후
-bash scripts/spark_container.sh post
-# 열린 컨테이너 안에서
-bash scripts/install_spark.sh post
-source .venv-spark-post/bin/activate
+source .venv-lab/bin/activate
+python -m pip install -r requirements/lab-post.txt
+python scripts/doctor.py --require-cuda --profile post
 # 이미 제공된 data/demo/post_preferences fixture를 사용합니다.
 # 다음으로 3절의 full SFT 선수 명령을 실행합니다.
 ```
 
-실제 학습·평가는 ARM64 Linux, CUDA 한 장, BF16 지원, `trl==0.24.0`을 확인한 다음 수행합니다. Mac에서 모델 import나 CPU 학습을 검증하는 경로는 제공하지 않습니다. `--dry-run`은 ML 라이브러리를 import하지 않고 schema와 checkpoint 조건만 검사합니다.
+실제 학습·평가는 Linux, CUDA 한 장, BF16 지원, `trl==0.24.0`을 확인한 다음 수행합니다. CPU로 자동 전환하지 않습니다. `--dry-run`은 ML 라이브러리를 import하지 않고 schema와 checkpoint 조건만 검사합니다.
 
 **버전의 차이:** TRL 0.24.0의 public API는 `from trl import PPOConfig, PPOTrainer`입니다. 해당 tagged source에는 향후 `trl.experimental`로 이동할 수 있다는 warning이 있지만 0.24.0의 이 코드는 experimental namespace를 import하지 않습니다. 최신 TRL 예제를 섞지 마세요. [고정 버전 PPO source](https://github.com/huggingface/trl/blob/v0.24.0/trl/trainer/ppo_trainer.py).
 
@@ -136,7 +134,7 @@ CUDA_VISIBLE_DEVICES=0 python 04_post_training/rlhf_ppo_huggingface/train.py \
 
 다른 SFT 결과를 사용하려면 full checkpoint 경로를 지정합니다. 여기서 classifier의 scalar head가 처음에는 임의 초기화되는 것은 정상입니다. 선호 학습을 완료하고 저장한 이후에만 PPO reward로 사용합니다. 단계를 분리해 보는 선택 실험은 `--model HuggingFaceTB/SmolLM2-135M-Instruct`로 바꾸되, PPO와 baseline 평가에도 동일한 모델을 지정합니다.
 
-학습 전후 validation metric을 기록하고, loss와 로그가 NaN/Inf이면 종료합니다. 출력은 scalar 모델 `config.json`/safetensors, distinct-PAD tokenizer, `training_metadata.json`입니다. metadata에는 실제 완료 step, library/CUDA/GPU 정보와 출발 모델 revision이 들어갑니다.
+학습 전후 validation metric을 기록하고, loss와 로그가 NaN/Inf이면 종료합니다. 출력은 scalar 모델 `config.json`/safetensors, distinct-PAD tokenizer, `training_metadata.json`입니다. metadata에는 실제 완료 step, 재현에 필요한 library/CUDA 버전과 출발 모델 revision을 남기며 내부 장비 식별 정보·비밀 값은 제외합니다.
 
 ## 7. 단계 B: held-out reward 평가
 
@@ -194,15 +192,15 @@ Spark 통합 메모리를 모두 모델에 쓸 수 있는 것은 아니며 호�
 
 한 번에 한 조건만 바꾸어 비교합니다.
 
-1. reward 학습 step 수를 늘려 train/test gap 변화 확인.
+1. reward 학습 step 수를 늘려 train/validation gap 변화 확인. test는 설정 선택 후 최종 비교에 사용.
 2. `--kl-coef` 0.02 / 0.05 / 0.1 비교: reward와 KL, 답변 변화.
 3. `--ppo-epochs` 1 / 2 비교: 같은 rollout 재사용의 효과.
 4. 산술 이외의 설명·정확성·형식 선호 쌍을 직접 작성하거나 사람에게 수집.
 5. 동일 SFT와 선호 데이터를 사용한 DPO 결과와 test 생성 비교.
 
-모든 stage는 기존 비어 있지 않은 출력 폴더를 보호합니다. 재실험할 때 새 `--output-dir`을 지정하세요. **이 폴더의 Spark CUDA RewardTrainer/PPO 실행은 아직 검증되지 않았고 테스트도 Mac에서 실행하지 않았습니다.** 정적 검토는 TRL 0.24.0 tagged API에 맞추어 수행했으며, GPU smoke/통합 검증은 Spark에서 실행해야 합니다.
+모든 stage는 기존 비어 있지 않은 출력 폴더를 보호합니다. 재실험할 때 새 `--output-dir`을 지정하세요. **이 폴더의 CUDA RewardTrainer/PPO 학습·저장·재로딩은 아직 검증되지 않았습니다.** 정적 검토는 TRL 0.24.0 tagged API를 기준으로 하며 실제 통합 검증은 지원 CUDA 환경에서 별도로 수행합니다.
 
-Spark에서 schema·출력 보호 테스트와 실제 RM→PPO→재로드 통합 테스트를 실행하려면 다음 명령을 사용합니다. 통합 테스트는 작은 step 수로 파이프라인을 검사하며 응답 품질을 증명하지 않습니다.
+지원 CUDA 환경에서 schema·출력 보호 테스트와 실제 RM→PPO→재로드 통합 테스트를 실행하려면 다음 명령을 사용합니다. 통합 테스트는 작은 step 수로 파이프라인을 검사하며 응답 품질을 증명하지 않습니다.
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 RUN_SPARK_POST_TESTS=1 python -m unittest discover -s tests -p test_post_rlhf.py

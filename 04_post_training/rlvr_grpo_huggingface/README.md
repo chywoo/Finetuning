@@ -1,6 +1,6 @@
 # P4 — RLVR + GRPO: 생성한 답을 검산하며 배우기
 
-[전체 학습 순서](../../docs/11_curriculum.md)의 SFT와 preference/RL 개념을 익힌 뒤 진행합니다. 이 수업은 **쉬운 산술 SFT → full checkpoint → strict verifier → GRPO LoRA**라는 별도 분기입니다. DPO 또는 PPO 모델을 자동으로 이어 붙이지 않습니다. DGX Spark ARM64 Linux/CUDA 전용이며 실제 GPU 학습·재로딩·성능 개선은 아직 검증하지 않았습니다.
+[전체 학습 순서](../../docs/11_curriculum.md)의 SFT와 preference/RL 개념을 익힌 뒤 진행합니다. 이 수업은 **쉬운 산술 SFT → full checkpoint → strict verifier → GRPO LoRA**라는 별도 분기입니다. DPO 또는 PPO 모델을 자동으로 이어 붙이지 않습니다. 단일 BF16 지원 CUDA 환경을 요구하며 실제 GPU 학습·재로딩·성능 개선은 아직 검증하지 않았습니다.
 
 ## 1. 고등학생 수준: 네 답을 놓고 비교하기
 
@@ -19,18 +19,15 @@ RLVR(reinforcement learning with verifiable rewards)은 보상이 계산으로 �
 
 모든 답이 틀려 `[0,0,0,0]`이면 어떤 답을 더 좋아해야 할지 알 수 없습니다. 모두 맞아 `[1,1,1,1]`여도 그룹 내 차이가 없습니다. 먼저 쉬운 산술 SFT로 적어도 일부 정답을 생성하게 하고, 정답/오답이 함께 나오는 그룹이 있는지 확인합니다. Step 수만 늘리는 것으로 이 문제를 해결한다고 가정하지 않습니다.
 
-## 2. Spark 환경과 실제 데이터
+## 2. CUDA 환경과 실제 데이터
 
 ```bash
-# Spark 호스트의 저장소 루트
-bash scripts/spark_container.sh post
-# 컨테이너 셸의 저장소 루트
-bash scripts/install_spark.sh post
-source .venv-spark-post/bin/activate
-python scripts/doctor.py --require-spark
+source .venv-lab/bin/activate
+python -m pip install -r requirements/lab-post.txt
+python scripts/doctor.py --require-cuda --profile post
 ```
 
-[Spark 환경 안내](../../docs/04_dgx_spark.md)를 먼저 확인합니다. TRL 0.24.0 / Transformers 4.57.6 / PEFT 0.18.1과 NVIDIA 컨테이너의 PyTorch/CUDA를 사용합니다. 이 실습은 단일 BF16 CUDA GPU를 요구합니다. `use_vllm=False`를 명시하여 모델의 Transformers generation을 사용하므로 vLLM 서버나 별도 설치가 필요하지 않습니다.
+[빠른 시작](../../docs/00_quickstart.md)의 환경 준비를 먼저 확인합니다. TRL 0.24.0 / Transformers 4.57.6 / PEFT 0.18.1과 장치에 맞는 PyTorch/CUDA를 사용합니다. 이 실습은 단일 BF16 CUDA GPU를 요구합니다. `use_vllm=False`를 명시하여 모델의 Transformers generation을 사용하므로 vLLM 서버나 별도 설치가 필요하지 않습니다.
 
 동봉 데이터는 작성된 CC0 정수 덧셈 48문제입니다. Download 없이 사용할 수 있습니다.
 
@@ -147,7 +144,7 @@ $$
 - `frac_reward_zero_std`: 그룹 내 reward가 전부 같은 비율입니다. 1에 가까우면 상대 correctness signal이 부족합니다. 전부 맞아서 1인지 전부 틀려서 1인지 구분하십시오.
 - Trainer 로그의 reward/reward_std/KL/생성 길이: update의 변화와 reward hacking을 점검하는 진단입니다. RL loss는 음수가 될 수도 있으므로 SFT loss처럼 숫자가 작아질수록 정확도가 높다고 해석하지 않습니다.
 
-API는 [TRL v0.24.0 GRPOConfig](https://github.com/huggingface/trl/blob/v0.24.0/trl/trainer/grpo_config.py)와 [GRPOTrainer](https://github.com/huggingface/trl/blob/v0.24.0/trl/trainer/grpo_trainer.py)의 group divisibility, reward 함수 keyword 전달, adapter-disabled reference, advantage 계산을 기준으로 확인했습니다. Source 검토는 실제 Spark 실행 성공을 의미하지 않습니다.
+API는 [TRL v0.24.0 GRPOConfig](https://github.com/huggingface/trl/blob/v0.24.0/trl/trainer/grpo_config.py)와 [GRPOTrainer](https://github.com/huggingface/trl/blob/v0.24.0/trl/trainer/grpo_trainer.py)의 group divisibility, reward 함수 keyword 전달, adapter-disabled reference, advantage 계산을 기준으로 확인했습니다. Source 검토는 실제 GPU 실행 성공을 의미하지 않습니다.
 
 실습 질문: `[0,0,0,0]`과 `[1,1,1,1]`의 accuracy는 다르지만 상대 advantage는 왜 같을까요? 정답을 포함한 긴 문장을 0점으로 만드는 것은 어떤 목표를 반영할까요? Sampling temperature를 높이면 정답률과 그룹 다양성이 어떻게 함께 변할까요?
 

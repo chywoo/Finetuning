@@ -1,6 +1,6 @@
 # 순서대로 배우는 fine-tuning / post-training 실습 계획
 
-사용자 지시로 작업을 재개했습니다. 현재는 0단계의 환경 준비 검토와 짧은 동작 검사까지 진행하며, 모델 학습과 오래 걸리는 실행은 제외합니다. 아래 학습 절차는 이후 실습 계획입니다. 작성된 코드, 현재 데이터 가용성, 실제 수행 상태는 체크리스트와 검증 문서에서 구분합니다.
+교육 자료·구현 보완과 학습 없는 빠른 검증을 완료했습니다. 모델 학습과 오래 걸리는 실행은 제외했으며 아래 학습 절차는 이후 실습 계획입니다. 작성된 코드, 현재 데이터 가용성, 실제 수행 상태는 [구축 완료 범위](13_readiness.md)와 체크리스트에서 구분합니다.
 
 이 문서는 **무엇을 먼저 배우고, 어떤 결과를 확인한 후 다음 단계로 갈지** 정한다. [전체 체크리스트](10_practice_checklist.md)는 모든 도구/기법 조합의 진행표다. 처음부터 34개 조합을 한꺼번에 실행하지 않고 아래 주 경로를 한 단계씩 진행한다. 선택 비교는 주 경로를 이해한 뒤 수행한다.
 
@@ -25,8 +25,8 @@ Domain fine-tuning은 별도의 RL 알고리즘이 아니다. 도메인 CPT와 t
 
 | 단계 | 난이도 | 대표 실습 | 먼저 준비할 것 | 다음 단계로 가는 조건 |
 |---|---|---|---|---|
-| 0 | 고등학생 | Python·JSONL·토큰·Spark 첫 수업 | [입문 수업](12_foundations.md), [빠른 시작](00_quickstart.md) | JSONL 한 줄과 학습/평가 split의 차이를 설명 |
-| 1 | 고등학생 | I1: PyTorch full instruction SFT | Dolly, SmolLM2 base, HF Spark 환경 | 학습→저장→재로딩 후 답변 3개 비교 |
+| 0 | 고등학생 | Python·JSONL·토큰·환경 첫 수업 | [입문 수업](12_foundations.md), [빠른 시작](00_quickstart.md) | JSONL 한 줄과 학습/평가 split의 차이를 설명 |
+| 1 | 고등학생 | I1: PyTorch full instruction SFT | Dolly, SmolLM2 base, HF 환경 | 학습→저장→재로딩 후 답변 3개 비교 |
 | 2 | 고등학생→대학 초반 | I4: HF LoRA instruction SFT | 1단계 보고서, 같은 Dolly split | base+adapter와 full checkpoint 차이 설명 |
 | 3 | 대학 초반 | C4/S4/K3: HF domain fine-tuning | SciQ support/QA, 일반 instruction baseline | CPT만/QA만/CPT→QA와 기존 능력 비교 |
 | 4 | 대학 초반 | P1: DPO | SFT/merge checkpoint, chosen/rejected pairs | 선호 쌍 검증, 전후 preference·생성 평가 |
@@ -40,7 +40,7 @@ Domain fine-tuning은 별도의 RL 알고리즘이 아니다. 도메인 CPT와 t
 
 ```mermaid
 flowchart TD
-  A[입문과 Spark 준비] --> B[PyTorch SFT]
+  A[입문과 환경 준비] --> B[PyTorch SFT]
   B --> C[HF LoRA SFT와 저장]
   C --> D[Domain CPT / QA SFT]
   D --> E[선호 데이터와 DPO]
@@ -58,7 +58,7 @@ flowchart TD
 처음에는 “문장의 다음 조각을 맞히는 기계”로 생각한다. Base 모델에게 질문한다고 항상 답이 나오지 않는다. Instruction SFT는 질문을 주고 원하는 답을 여러 번 보여 준다. 예를 들어 “세 색을 써라”에는 “red, blue, yellow”가 정답이다. 모델이 정답에 높은 확률을 주면 loss가 작아진다.
 
 1. [입문 수업](12_foundations.md)에서 토큰·loss·gradient를 작은 숫자로 확인한다.
-2. [빠른 시작](00_quickstart.md)으로 Spark 컨테이너/overlay를 준비한다. 기존 데이터가 있으면 다운로드 명령은 생략한다.
+2. [빠른 시작](00_quickstart.md)으로 실습 환경을 준비한다. 기존 데이터가 있으면 다운로드 명령은 생략한다.
 3. [I1 PyTorch](../01_instruction/pytorch/README.md)의 full 학습을 실행한다. 기본 20 update는 코드 흐름 확인용이다.
 4. 같은 prompt의 학습 전/후 생성 3개를 표로 적는다. “형식 준수/관련성/정확성”을 각각 판단한다.
 5. [I4 HF LoRA](../01_instruction/huggingface/README.md)로 이동한다. 모델을 모두 바꾸는 대신 작은 추가 행렬만 바꿨다는 차이를 설명한다.

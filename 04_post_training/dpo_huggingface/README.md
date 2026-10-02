@@ -1,6 +1,6 @@
 # P1 — DPO: 두 답을 비교해서 선호 순서 배우기
 
-먼저 [학습 순서](../../docs/11_curriculum.md)의 instruction SFT와 모델 저장/재로딩을 완료합니다. 이 실습은 **SFT checkpoint → 전체 모델로 merge → 새로운 DPO LoRA** 순서입니다. DGX Spark의 ARM64 Linux/CUDA 전용이며, 아래 GPU 학습·재로딩·품질 개선은 아직 실제 Spark에서 검증하지 않았습니다.
+먼저 [학습 순서](../../docs/11_curriculum.md)의 instruction SFT와 모델 저장/재로딩을 완료합니다. 이 실습은 **SFT checkpoint → 전체 모델로 merge → 새로운 DPO LoRA** 순서입니다. 단일 BF16 지원 CUDA 환경을 요구하며 GPU 학습·재로딩·품질 개선은 아직 검증하지 않았습니다.
 
 ## 1. 고등학생 수준의 직관
 
@@ -10,18 +10,15 @@ SFT는 한 모범 답을 보여 줍니다. DPO는 같은 질문에 두 답을 �
 
 정책(policy)은 업데이트할 답변 모델입니다. Reference는 비교 기준으로 고정한 **현재 SFT 모델**입니다. SFT LoRA를 먼저 merge한 전체 모델에서 새 LoRA를 만들면, 새 adapter를 껐을 때 SFT 출발점으로 정확히 돌아갑니다. SFT adapter를 그대로 DPO adapter처럼 취급하면 reference의 의미가 달라질 수 있어 이 실습은 unmerged adapter를 거절합니다.
 
-## 2. Spark 환경과 데이터
+## 2. CUDA 환경과 데이터
 
 ```bash
-# DGX Spark 호스트의 저장소 루트
-bash scripts/spark_container.sh post
-# 열린 컨테이너 셸의 저장소 루트
-bash scripts/install_spark.sh post
-source .venv-spark-post/bin/activate
-python scripts/doctor.py --require-spark
+source .venv-lab/bin/activate
+python -m pip install -r requirements/lab-post.txt
+python scripts/doctor.py --require-cuda --profile post
 ```
 
-환경은 TRL 0.24.0, Transformers 4.57.6, PEFT 0.18.1을 대상으로 합니다. NVIDIA 컨테이너의 PyTorch/CUDA를 유지합니다. [Spark 안내](../../docs/04_dgx_spark.md)를 함께 읽으십시오. 이 실습은 한 개의 BF16 지원 CUDA GPU를 요구하며 다른 장치로 자동 전환하지 않습니다.
+환경은 TRL 0.24.0, Transformers 4.57.6, PEFT 0.18.1을 대상으로 합니다. 장치에 맞는 PyTorch/CUDA와 [일반 환경 준비](../../docs/00_quickstart.md)를 사용합니다. Spark 선택 환경은 [전용 안내](../../docs/04_dgx_spark.md)를 따릅니다. 이 실습은 한 개의 BF16 지원 CUDA GPU를 요구하며 다른 장치로 자동 전환하지 않습니다.
 
 작은 CC0 fixture를 실제 파일로 동봉했습니다. 다운로드할 필요가 없습니다.
 

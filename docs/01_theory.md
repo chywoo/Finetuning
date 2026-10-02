@@ -56,13 +56,13 @@ $$W'=W+\frac{\alpha}{r}BA,\quad A\in\mathbb{R}^{r\times d_{in}},\ B\in\mathbb{R}
 
 원래 `d_out × d_in`개를 학습하던 층에서 `r × (d_in+d_out)`개의 adapter 파라미터를 학습합니다. `r`은 rank, `alpha`는 스케일입니다. rank를 늘리면 표현 용량·학습 메모리가 늘지만 자동으로 품질이 좋아지지 않습니다. `target_modules`는 adapter를 넣을 위치이며 attention의 q/v 또는 더 많은 선형층을 선택할 수 있습니다.
 
-LoRA를 저장하면 base 모델을 포함한 완전한 checkpoint가 아닙니다. 추론에서는 **같은 base 모델/revision + adapter + tokenizer**가 필요합니다. `merge_and_unload()`로 새 전체 모델을 만들 수 있습니다. [LoRA 원 논문](https://arxiv.org/abs/2106.09685), [PEFT LoRA 안내](https://huggingface.co/docs/peft/main/en/developer_guides/lora)를 참고합니다.
+LoRA를 저장하면 base 모델을 포함한 완전한 checkpoint가 아닙니다. 추론에서는 **같은 base 모델/revision + adapter + tokenizer**가 필요합니다. `merge_and_unload()`로 새 전체 모델을 만들 수 있습니다. [LoRA 원 논문](https://arxiv.org/abs/2106.09685), [PEFT 고정 버전 LoRA 안내](https://huggingface.co/docs/peft/v0.18.1/en/developer_guides/lora)를 참고합니다.
 
 ## QLoRA
 
 동결한 base를 낮은 비트로 로드하고 LoRA adapter를 학습하는 접근입니다. 이 저장소의 HF QLoRA는 bitsandbytes NF4·double quantization과 적절한 floating-point compute dtype을 사용합니다. **4-bit 정수 가중치 전체를 직접 gradient update하는 실습이 아닙니다.**
 
-Base 저장 메모리는 줄어들어도 activation·optimizer·adapter·임시 dequantization buffer가 필요합니다. 작은 모델에선 양자화 overhead가 커서 체감 이득이 작을 수 있습니다. Spark에서 먼저 LoRA/full로 흐름을 익힌 뒤 같은 조건의 QLoRA를 비교합니다. [QLoRA 원 논문](https://arxiv.org/abs/2305.14314), [HF bitsandbytes 문서](https://huggingface.co/docs/transformers/en/quantization/bitsandbytes)를 참고합니다.
+Base 저장 메모리는 줄어들어도 activation·optimizer·adapter·임시 dequantization buffer가 필요합니다. 작은 모델에선 양자화 overhead가 커서 체감 이득이 작을 수 있습니다. 지원 CUDA 환경에서 먼저 LoRA/full로 흐름을 익힌 뒤 같은 조건의 QLoRA를 비교합니다. [QLoRA 원 논문](https://arxiv.org/abs/2305.14314), [HF bitsandbytes 문서](https://huggingface.co/docs/transformers/en/quantization/bitsandbytes)를 참고합니다.
 
 ## VLM의 학습
 

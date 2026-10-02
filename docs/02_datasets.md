@@ -88,7 +88,7 @@ label mapping은 `0=angular_leaf_spot`, `1=bean_rust`, `2=healthy`입니다. 원
 python -m finetune_lab.prepare_data --task knowledge --source hf --revision 2c94ad3e1aafab77146f384e23536f97a4849815 --output-root data/reproduced
 ```
 
-HF cache 경로는 Spark launcher가 `.cache/huggingface`에 연결합니다. 데이터·cache·모델 산출물은 source 코드와 분리합니다. data/demo의 자체 작성 text와 합성 이미지는 CC0 교육 fixture로 제공하며, 실제 공개 데이터셋 결과로 표시하지 않습니다.
+일반 환경은 Hugging Face 기본 cache를 사용하며, Spark launcher는 프로젝트의 `.cache/huggingface`에 연결합니다. 데이터·cache·모델 산출물은 source 코드와 분리합니다. data/demo의 자체 작성 text와 합성 이미지는 CC0 교육 fixture로 제공하며, 실제 공개 데이터셋 결과로 표시하지 않습니다.
 
 ## Post-training 자체 작성 데이터
 
@@ -101,7 +101,7 @@ Preference schema는 `id/prompt/chosen/rejected`입니다. 작은 덧셈의 올�
 준비된 파일은 그대로 사용합니다. 다시 생성하려면 새 출력 root를 정합니다. 기존 디렉토리는 보호됩니다.
 
 ```bash
-# Spark 컨테이너 내부: 데이터를 새 경로에 생성할 때만
+# 프로젝트 루트: 데이터를 새 경로에 생성할 때만
 python -m finetune_lab.post_data --task all --output-root data/reproduced_post
 ```
 

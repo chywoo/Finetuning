@@ -6,7 +6,7 @@
 
 주 경로는 PyTorch full(I1) → HF LoRA(I4) → [Domain 수업](../../04_post_training/domain_huggingface/README.md)입니다. 다른 full/QLoRA/Unsloth 조합은 주 경로를 마친 뒤 선택 비교합니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
 이 실습은 **문장을 이어 쓰도록 사전학습한 base 모델에 질문·지시 → 응답 패턴을 학습**시킵니다. `HuggingFaceTB/SmolLM2-135M`으로 시작하며, `-Instruct` 모델로 시작하지 않습니다. 135M은 약 1억 3,500만 파라미터입니다. 기본 모델은 영어 중심이므로 설명은 한국어로 제공하고 초기 데이터는 영어로 사용합니다. 모델의 base/instruct 구분, 지원 언어와 Apache-2.0 라이선스는 [공식 모델 카드](https://huggingface.co/HuggingFaceTB/SmolLM2-135M)를 확인하십시오.
 
@@ -26,25 +26,21 @@ Name two primary colors.
 Red and blue.<EOS>
 ```
 
-여기서 teacher forcing은 생성된 이전 답변 대신 **데이터의 정답 토큰**을 다음 토큰 예측의 조건으로 사용하는 방식입니다. 실제 추론에서는 모델이 직접 생성한 이전 토큰을 사용합니다. 목표 loss는 응답 구간의 `-log P(정답 토큰 | 앞선 토큰)` 평균입니다. SFT의 next-token 학습 원리는 [Transformers causal language modeling 안내](https://huggingface.co/docs/transformers/main/en/tasks/language_modeling)를 참고하십시오.
+여기서 teacher forcing은 생성된 이전 답변 대신 **데이터의 정답 토큰**을 다음 토큰 예측의 조건으로 사용하는 방식입니다. 실제 추론에서는 모델이 직접 생성한 이전 토큰을 사용합니다. 목표 loss는 응답 구간의 `-log P(정답 토큰 | 앞선 토큰)` 평균입니다. SFT의 next-token 학습 원리는 [고정 버전 Transformers causal language modeling 안내](https://huggingface.co/docs/transformers/v4.57.6/en/tasks/language_modeling)를 참고하십시오.
 
 Instruction 부분은 조건으로 사용하지만 loss의 정답으로 사용하지 않습니다. 해당 `labels`를 `-100`으로 표시합니다. 응답과 EOS만 정답에 포함합니다. EOS는 답변 종료를 학습합니다. Padding은 배치 길이를 맞추기 위한 자리이므로 loss와 attention에서 제외합니다. PAD와 EOS의 ID가 같더라도 실제 EOS는 학습해야 하므로 **토큰 ID가 아닌 padding 위치**로 masking합니다.
 
 Hugging Face 모델의 `forward(labels=...)`가 causal shift를 수행합니다. 코드에서 정답을 다시 한 칸 이동하면 두 칸 뒤를 예측하게 되므로 이동시키지 않습니다. Full fine-tuning은 원래 가중치를 모두 업데이트합니다. LoRA 옵션은 원래 가중치를 고정하고 작은 저랭크 행렬만 업데이트합니다.
 
-## 2. DGX Spark 환경과 자원
+## 2. 실행 환경과 자원
 
-실제 학습 대상은 **DGX Spark의 ARM64 Linux + CUDA**입니다. 준비·컨테이너 버전·GPU 확인 절차는 [DGX Spark 실행 안내](../../docs/04_dgx_spark.md)를 먼저 읽으십시오. Spark에 복사한 저장소 루트에서 HF/PyTorch 컨테이너를 시작하고, 열린 컨테이너 셸에서 설치합니다.
+일반 환경은 [빠른 시작](../../docs/00_quickstart.md)의 `.venv-lab`과 `requirements/lab-hf.txt`를 준비합니다. 아래 명령은 프로젝트 루트에서 실행합니다. 작은 텍스트 full·LoRA는 CPU에서도 가능하며, VLM은 모델 크기와 processor 메모리를 확인하고 CUDA를 권장합니다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay를 선택합니다.
 
 ```bash
-# DGX Spark 호스트의 저장소 루트에서 실행
-bash scripts/spark_container.sh hf
-# 이후 명령은 컨테이너 안의 저장소 루트에서 실행
-bash scripts/install_spark.sh hf
-source .venv-spark-hf/bin/activate
+source .venv-lab/bin/activate
 ```
 
-이후 문서의 `python` 명령은 모두 이 컨테이너 셸에서 실행합니다. NVIDIA 컨테이너에 포함된 Spark용 PyTorch/CUDA를 사용하며, 일반 x86 CUDA 또는 macOS wheel로 교체하지 않습니다. 학습 명령에는 `--device cuda`를 명시해 GPU가 준비되지 않았을 때 다른 장치에서 실행되지 않도록 합니다.
+이후 `python` 명령은 활성화한 실습 환경에서 실행합니다. CUDA 명령에는 `--device cuda`를 명시해 GPU가 준비되지 않았을 때 오류를 확인합니다. CPU 텍스트 실습은 `--device cpu --dtype float32`를 선택합니다.
 
 `--dtype auto`는 지원되는 CUDA에서 **bfloat16 autocast**로 연산하고, 가중치·gradient·Adam 상태는 float32로 유지합니다. `--dtype bfloat16`은 CUDA BF16 지원이 없으면 실패하고, `--dtype float32`는 비교를 위한 FP32 연산입니다. BF16은 FP16보다 넓은 지수 범위를 사용하며 이 루프는 GradScaler를 사용하지 않습니다. Autocast는 연산과 activation에 영향을 주고, optimizer 상태 메모리를 4bit로 줄이는 QLoRA와는 다릅니다.
 
@@ -179,3 +175,12 @@ print(tokenizer.decode(outputs[0, inputs["input_ids"].shape[1]:], skip_special_t
 - OOM이면 `batch-size`를 먼저 줄이고 `max-length`를 줄입니다. Accumulation을 늘려 update당 예제 수를 유지할 수 있지만 activation memory는 현재 microbatch가 결정합니다.
 - 응답이 계속 반복되면 EOS label이 남아 있는지, 정답이 반복되지 않는지 확인하십시오. `tests/test_text_encoding.py`가 EOS/PAD와 truncation 사례를 검사합니다.
 - 한국어를 확장할 때는 한국어에 적합한 **base** 모델과 같은 라이선스 검토를 거친 한국어 instruction 데이터를 사용하십시오. 작은 영어 모델에 한국어 데이터 몇 개를 주는 것만으로 충분한 한국어 능력이 생기지는 않습니다.
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: 동일 validation의 response loss와 생성 답변을 비교하고 지시 준수·관련성·정확성·종료를 읽어 설명합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. 다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

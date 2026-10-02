@@ -1,6 +1,6 @@
 # Fine-tuning 학습 실습실
 
-사용자 지시로 작업을 재개했습니다. 현재 범위는 환경 준비 검토와 짧은 동작 검사이며, 모델 학습과 오래 걸리는 작업은 실행하지 않습니다. 확인한 결과와 미확인 범위는 [검증 상태](docs/07_validation.md)에 구분하고, 주요 작업 완료 시 local Git commit과 [TASK_LOGS.md](TASK_LOGS.md) 기록을 남깁니다.
+실습 코드·교육 문서·데이터 검사와 빠른 회귀 검증을 보완했습니다. **172개 테스트 통과, 전체 coverage 81.56%**이며 실제 모델 학습과 품질 비교는 실행하지 않았습니다. [구축 완료와 실행 범위](docs/13_readiness.md)에 근거와 환경별 미확인 항목을 구분했습니다. 시간별 기록은 [TASK_LOGS.md](TASK_LOGS.md)를 따릅니다.
 
 **LLM이 답하는 법을 배우는 SFT부터, 도메인 적응·선호 학습 DPO·RLHF PPO·검산 보상 RLVR GRPO와 VLM 이미지 적응까지 순서대로 실습합니다.** 설명은 한국어이고, 작은 모델과 영어 공개 데이터로 계산 비용을 줄였습니다. 영어 중심 모델의 실험 결과를 한국어 능력 향상으로 해석하지 않습니다.
 
@@ -10,7 +10,7 @@
 
 | 순서 | 실습 소개 | 들어가기 전에 준비 | 수업 |
 |---|---|---|---|
-| 0 | 다음 단어 맞히기, 정답 점수, 데이터 분할 | Python 함수/CLI/JSONL 기초; 수학은 평균과 확률부터 | [고등학생 첫 수업](docs/12_foundations.md), [Spark 첫 실행](docs/00_quickstart.md) |
+| 0 | 다음 단어 맞히기, 정답 점수, 데이터 분할 | Python 함수/CLI/JSONL 기초; 수학은 평균과 확률부터 | [고등학생 첫 수업](docs/12_foundations.md), [환경 준비와 첫 실습](docs/00_quickstart.md) |
 | 1 | Base LLM에 질문→답변을 가르치는 PyTorch SFT | Dolly, base 모델, CUDA 환경 | [I1 PyTorch full](01_instruction/pytorch/README.md) |
 | 2 | 작은 추가 행렬만 학습하는 LoRA | 1단계 저장/재로딩과 baseline 이해 | [I4 HF LoRA](01_instruction/huggingface/README.md) |
 | 3 | 과학 문서 읽기와 과학 QA를 비교하는 Domain fine-tuning | SciQ, 일반 instruction baseline | [C4/S4/K3 Domain 과정](04_post_training/domain_huggingface/README.md) |
@@ -37,13 +37,12 @@
 
 [Post-training 입구](04_post_training/README.md)에서 HF Transformers/PEFT + TRL 한 경로로 준비합니다. Domain 과정은 기존 지식 케이스를 재사용하고, DPO·reward model·PPO·GRPO 네 케이스를 추가해 총 34개를 관리합니다. 실제 개발 사례와 도구 선택 근거는 [실습 계획](docs/11_curriculum.md)에 기록했습니다.
 
+Python 3.11/3.12와 장치에 맞는 PyTorch를 준비한 일반 실습 환경에서는 다음과 같이 post 도구를 추가합니다. Spark의 NGC overlay는 [선택 환경 안내](docs/04_dgx_spark.md)를 따릅니다.
+
 ```bash
-# Spark 호스트
-bash scripts/spark_container.sh post
-# 컨테이너 내부
-bash scripts/install_spark.sh post
-source .venv-spark-post/bin/activate
-python scripts/doctor.py --require-spark
+source .venv-lab/bin/activate
+python -m pip install -r requirements/lab-post.txt
+python scripts/doctor.py --profile post --require-cuda
 ```
 
 선호 데이터, reward model과 verifier의 입력 형식은 각 수업의 README에서 먼저 확인합니다. 자체 작성 선호·산술 데이터는 원리 실습용이며 실제 사람 피드백이나 일반 추론 benchmark로 해석하지 않습니다.
@@ -100,16 +99,16 @@ outputs/                                      # 모델·adapter·평가 보고�
 
 실제 데이터는 이미 이 작업 공간의 `data/processed/`에 준비했습니다. 다른 컴퓨터에서는 `prepare_data` 명령으로 같은 HF 데이터셋을 내려받습니다. 다운로드 시 dataset revision SHA와 JSONL SHA256을 기록하며, 기존 분할을 덮어쓰려면 `--overwrite`를 지정해야 합니다. 큰 원본 데이터는 Hugging Face cache에도 저장됩니다.
 
-저장소와 준비된 데이터를 함께 Spark에 복사했다면 위 데이터 준비 명령은 생략합니다. 첫 실습에서 명령은 저장소 루트에서 실행하고, 모델 다운로드 공간과 새 output 경로를 확보합니다. 각 수업의 선수 조건·데이터 예시·baseline부터 읽은 뒤 학습 명령으로 진행합니다.
+저장소와 준비된 데이터를 함께 복사했다면 위 데이터 준비 명령은 생략합니다. 첫 실습에서 명령은 저장소 루트에서 실행하고, 모델 다운로드 공간과 새 output 경로를 확보합니다. 각 수업의 선수 조건·데이터 예시·baseline부터 읽은 뒤 학습 명령으로 진행합니다.
 
 ## 검증과 학습 기록
 
 ```bash
-python scripts/doctor.py --require-spark
-python scripts/validate_spark.py --profile hf --include-vision
-RUN_ML_TESTS=1 python -m pytest --cov=finetune_lab --cov-report=term-missing --cov-fail-under=80
+python scripts/check_data.py
+python scripts/doctor.py --profile post --require-cuda
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 RUN_ML_TESTS=0 RUN_POST_TRAINING_TESTS=0 RUN_SPARK_POST_TESTS=0 python -m pytest --cov=finetune_lab --cov-report=term-missing --cov-fail-under=80
 ```
 
-[검증 안내](docs/07_validation.md)에 짧은 환경 검사 결과와 아직 확인하지 않은 범위를 정리했습니다. 전체 학습·저장·재로딩 검증과 coverage 80%는 미확인입니다. [평가 안내](docs/03_evaluation.md)는 결과 해석, [문제 해결](docs/05_troubleshooting.md)은 OOM·마스킹·환경 오류를 다룹니다. 코드 연결 관계는 [Graft 탐색 안내](docs/09_code_map.md)를 참고합니다.
+[검증 안내](docs/07_validation.md)에 실제 검사 결과와 미확인 범위를 정리했습니다. 모델 학습과 학습 전후 품질 비교, Unsloth·QLoRA·VLM native kernel 검증은 미실시입니다. [평가 안내](docs/03_evaluation.md)는 결과 해석, [문제 해결](docs/05_troubleshooting.md)는 OOM·마스킹·환경 오류를 다룹니다. 코드 연결 관계는 [Graft 탐색 안내](docs/09_code_map.md)를 참고합니다.
 
 원문을 학습해도 정확한 지식 검색을 보장하지 않습니다. 자주 바뀌는 사실이나 출처가 필요한 답변에는 RAG도 비교합니다. [확장 학습](docs/08_next_experiments.md)에 DPO, 한국어 데이터, RAG 비교, 멀티 GPU 확장 과제를 정리했습니다.

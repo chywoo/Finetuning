@@ -6,7 +6,7 @@
 
 주 경로는 PyTorch full(I1) → HF LoRA(I4) → [Domain 수업](../../04_post_training/domain_huggingface/README.md)입니다. 다른 full/QLoRA/Unsloth 조합은 주 경로를 마친 뒤 선택 비교합니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
 이 실습은 `HuggingFaceTB/SmolLM2-135M` **base 모델**에 Dolly의 지시와 답변을 학습시킨다. Base 모델은 다음 텍스트를 이어 쓰도록 사전학습됐지만, 사용자 지시를 수행하는 답변 형식을 충분히 배우지 않았다. 같은 질문을 학습 전후에 넣고, 답변 형식과 검증 손실이 어떻게 바뀌는지 관찰하는 것이 목표다.
 
@@ -89,9 +89,9 @@ Return the number 12 with no extra words.
 
 ## 3. 환경 준비
 
-대상 장비는 **NVIDIA DGX Spark**이다. Linux ARM64(`aarch64`) CPU와 Blackwell GPU의 compute capability **12.1 (`sm_121`)**을 사용한다. 설치·드라이버·컨테이너의 공통 절차는 [DGX Spark 실행 가이드](../../docs/04_dgx_spark.md)를 먼저 따른다. 아래 호스트 명령은 Spark의 저장소 루트에서 실행한다. 이 문서의 GPU 학습 결과는 아직 실행으로 확인하지 않았다.
+Unsloth는 지원되는 Linux NVIDIA CUDA 환경에서 별도 가상환경으로 설치한다. [공식 설치 안내](https://unsloth.ai/docs/get-started/install-and-update)에 따라 GPU·PyTorch·Triton·bitsandbytes 조합을 확인한다. 본 수업의 학습 코드 기준은 TRL 0.24.0과 Transformers 4.57.6이므로 다른 버전의 예제를 섞지 않는다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay 절차를 선택한다.
 
-Unsloth는 NVIDIA의 Spark용 NGC **25.11-py3** PyTorch 컨테이너 위에 설치한다. 컨테이너의 ARM64·Blackwell 대응 PyTorch/CUDA/Triton을 유지하면서 Python 라이브러리 overlay만 추가한다. 일반 호스트용 `pip install torch`나 임의 CUDA wheel 교체는 이 절차에 포함하지 않는다. 설치 스크립트가 `requirements/spark-unsloth.txt`와 컨테이너 패키지 constraints를 사용한다.
+아래 Spark 설치 예시는 선택 환경이다. 일반 CUDA 환경은 공식 Unsloth 설치 절차를 사용하고 PyTorch/HF 환경과 분리한다.
 
 ```bash
 # DGX Spark 호스트에서 컨테이너 진입
@@ -114,7 +114,7 @@ python -m finetune_lab.prepare_data --task instruction --source demo --output-ro
 python 01_instruction/unsloth/train.py --data-dir data/demo/instruction --dry-run
 ```
 
-demo는 직접 만든 숫자 지시 fixture이며 실제 성능 데이터가 아니다. Spark 컨테이너에서 dry-run은 JSONL 스키마와 train/validation/test split의 존재·중복을 확인하고 모델·출력 경로·학습 종류를 JSON으로 보여준다. Unsloth, CUDA 패키지, 모델 가중치는 로딩하지 않고 출력 디렉토리도 생성하지 않는다. Dry-run 통과는 GPU 커널 검증을 뜻하지 않는다.
+demo는 직접 만든 숫자 지시 fixture이며 실제 성능 데이터가 아니다. 어떤 환경에서도 dry-run은 JSONL 스키마와 train/validation/test split의 존재·중복을 확인하고 모델·출력 경로·학습 종류를 JSON으로 보여준다. Unsloth, CUDA 패키지, 모델 가중치는 로딩하지 않고 출력 디렉토리도 생성하지 않는다. Dry-run 통과는 GPU 커널 검증을 뜻하지 않는다.
 
 ### 4-2. 실제 Hugging Face 데이터 준비
 
@@ -146,7 +146,7 @@ python 01_instruction/unsloth/train.py \
   --load-in-4bit
 ```
 
-단일 Spark GPU에서 effective batch size는 `1 × 4 = 4`이다. 20 optimizer step은 20개 예제를 뜻하지 않는다. 학습은 validation loss를 시작 전에 측정하고, train만 업데이트한 뒤 다시 validation loss를 측정한다. `metrics.json`에 두 값과 train 지표를 기록한다. 각 model loss가 NaN/Inf이면 backward 전에 중단하고, 검증·최종 지표가 비정상이면 성공 결과 저장을 중단한다.
+단일 GPU에서 effective batch size는 `1 × 4 = 4`이다. 20 optimizer step은 20개 예제를 뜻하지 않는다. 학습은 validation loss를 시작 전에 측정하고, train만 업데이트한 뒤 다시 validation loss를 측정한다. `metrics.json`에 두 값과 train 지표를 기록한다. 각 model loss가 NaN/Inf이면 backward 전에 중단하고, 검증·최종 지표가 비정상이면 성공 결과 저장을 중단한다.
 
 완료한 출력 경로에는 `adapter_config.json`, `adapter_model.safetensors`, tokenizer 파일, `training_metadata.json`, `metrics.json` 등이 저장된다. 이것은 **base 모델 전체가 아닌 adapter**다. 기존 성공 결과를 덮어쓰지 않도록 새 실행에는 새로운 `--output-dir`를 사용한다. 이 짧은 실습은 중간 optimizer checkpoint를 저장하지 않으므로 중단 시 정확한 optimizer 상태 복구를 제공하지 않는다.
 
@@ -199,3 +199,12 @@ python -m pip freeze > outputs/unsloth_environment.txt
 | `no kernel image` / `sm_121` 오류 | Spark 컨테이너·CUDA 커널 빌드와 ARM64 wheel 확인. 공통 Spark 가이드의 점검 절차 수행 |
 
 SFT는 지시와 답변의 패턴을 배우는 단계다. 사람의 선호를 최적화하는 DPO/RLHF, 일반적 안전성 검증, 새로운 지식의 장기 보존까지 이 실험 하나로 완료되는 것은 아니다. 다음으로 지식 실습의 CPT와 SFT를 비교하면 두 학습 목표의 차이를 확인할 수 있다.
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: 동일 validation의 response loss와 생성 답변을 비교하고 지시 준수·관련성·정확성·종료를 읽어 설명합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. Unsloth 경로는 선택 확장이므로 지원 환경이 없으면 미실행으로 남기고 주 경로를 진행합니다.다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

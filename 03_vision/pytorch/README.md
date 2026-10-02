@@ -6,7 +6,7 @@
 
 Post-training의 확률/loss·보상 수업을 마친 뒤 PyTorch V1 → HF V2 순으로 진행합니다. Unsloth V3는 다른 모델을 사용하는 선택 확장입니다. 완료하면 [추가 비교 과제](../../docs/08_next_experiments.md)로 이동합니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
 이 실습은 이미 이미지를 볼 수 있는 `HuggingFaceTB/SmolVLM-256M-Instruct`에
 콩 잎의 세 가지 상태를 구분하는 과제를 학습시킨다. 이미지와 질문을 넣으면
@@ -72,13 +72,7 @@ Hub 카드의 라이선스 항목은 명확한 허용 조건을 제시하지 않
 
 ## 3. 준비와 실행
 
-아래 명령은 **DGX Spark의 ARM64/CUDA PyTorch 컨테이너** 안에서 저장소
-최상위 디렉토리를 기준으로 실행한다. 먼저
-[공통 DGX Spark 환경 문서](../../docs/04_dgx_spark.md)를 따라 GB10을 지원하는
-NGC PyTorch 환경을 준비한다. 호스트에서 `bash scripts/spark_container.sh hf`를
-실행하고 컨테이너 안에서 `bash scripts/install_spark.sh hf`로 실습 dependency를 설치한다.
-설치 후 `source .venv-spark-hf/bin/activate`로 실습 환경을 활성화한다.
-컨테이너의 CUDA PyTorch를 일반 pip wheel로 덮어쓰지 않는다.
+일반 환경은 [빠른 시작](../../docs/00_quickstart.md)의 `.venv-lab`과 `requirements/lab-hf.txt`를 준비합니다. 아래 명령은 프로젝트 루트에서 실행합니다. 작은 텍스트 full·LoRA는 CPU에서도 가능하며, VLM은 모델 크기와 processor 메모리를 확인하고 CUDA를 권장합니다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay를 선택합니다.
 모델과 데이터의 첫 다운로드에는 인터넷이 필요하다. PyTorch 방식도
 모델/processor를 읽기 위해 Transformers를 사용하지만 학습 loop와 optimizer는 직접 작성한다.
 
@@ -107,7 +101,7 @@ python 03_vision/pytorch/train.py --evaluate --device cuda \
 `--max-steps`는 optimizer 업데이트 횟수다. 위 설정은 업데이트마다 최대 4개
 이미지의 gradient를 누적하므로 20번에 약 80개 이미지 입력을 처리한다.
 빠른 실행 점검을 위한 값이며 수렴이나 정확도 개선을 보장하지 않는다.
-이 실습의 실제 실행·검증 장치는 DGX Spark CUDA다. `--device cuda`를 명시해
+실제 GPU 실행은 호환되는 CUDA 환경에서 확인한다. `--device cuda`를 명시해
 GPU 환경이 준비되지 않았을 때 바로 오류를 확인한다. 이 교육용 직접 loop는
 float32를 사용한다. BF16/AMP를 추가하는 최적화는 별도 실험으로 비교할 수 있다.
 메모리가 부족하면 batch size와 decoder layer 수를 줄인다.
@@ -168,3 +162,12 @@ Validation loss가 내려가도 test의 이미지 분류 점수가 개선되지 
   validation/test는 서로 크기가 다르므로 실습 도구가 허용하는 최대치를 확인한다.
 - 이미지 분류가 목표라면 작은 전용 ViT/ResNet 분류기와도 비교한다. VLM은
   질문과 이미지 설명으로 확장하기 쉽지만 순수 분류에서 항상 가장 경제적이지는 않다.
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: 동일 이미지와 prompt의 accuracy·macro-F1·invalid 출력 및 클래스별 오분류를 비교합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. 다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

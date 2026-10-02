@@ -6,7 +6,7 @@
 
 HF의 C4/S4/K3를 묶은 [Domain 주 수업](../../04_post_training/domain_huggingface/README.md)에서 시작합니다. CPT만/QA만/CPT→QA를 비교한 뒤 [DPO 수업](../../04_post_training/dpo_huggingface/README.md)으로 이동합니다. 다른 도구/기법은 선택 비교입니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
 이 실습은 이미 instruction 학습을 받은 `HuggingFaceTB/SmolLM2-135M-Instruct`에 과학 문서와 QA를 추가 학습합니다. **문서의 다음 토큰을 학습하는 CPT**와 **질문 → 정답을 학습하는 QA SFT**를 `--stage`로 구분합니다. 학습 loop는 직접 PyTorch, 모델·tokenizer 로딩은 Hugging Face Transformers입니다. 모델은 영어 중심이며 Apache-2.0 라이선스로 제공됩니다. Base와 instruct의 배경은 [공식 모델 카드](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct)를 참고하십시오.
 
@@ -29,16 +29,12 @@ CPT는 문장을 익히므로 답을 대화 형식으로 전달하는 능력까�
 [allenai/sciq](https://huggingface.co/datasets/allenai/sciq)는 물리·화학·생물 등의 과학 객관식 문제 13,679개입니다. 공식 split은 train 11,679 / validation 1,000 / test 1,000이며 `question`, `correct_answer`, `distractor1/2/3`, `support`를 제공합니다. Support가 없는 문제도 있습니다. 공식 라이선스는 **CC-BY-NC-3.0**이므로 이 데이터 사용 결과를 상업적으로 활용하려면 조건을 확인해야 합니다.
 
 ```bash
-# DGX Spark 호스트의 저장소 루트에서 컨테이너 시작
-bash scripts/spark_container.sh hf
-# 이후 컨테이너 셸의 저장소 루트에서 설치와 실습 실행
-bash scripts/install_spark.sh hf
-source .venv-spark-hf/bin/activate
+source .venv-lab/bin/activate
 python -m finetune_lab.prepare_data --task knowledge --source hf \
   --train-samples 256 --eval-samples 32
 ```
 
-실제 학습 대상은 **DGX Spark의 ARM64 Linux + CUDA**입니다. [DGX Spark 실행 안내](../../docs/04_dgx_spark.md)에서 컨테이너 버전·GPU 확인 절차를 먼저 확인하십시오. NVIDIA 컨테이너의 Spark용 PyTorch/CUDA를 사용하고 다른 플랫폼의 wheel로 교체하지 않습니다. 이후 명령은 모두 열린 컨테이너 셸의 저장소 루트에서 실행합니다. 데이터와 모델은 처음 준비할 때 다운로드하며 HF cache에 저장됩니다. 같은 위치를 덮어쓰려면 `--overwrite`가 필요합니다.
+일반 환경은 [빠른 시작](../../docs/00_quickstart.md)의 `.venv-lab`과 `requirements/lab-hf.txt`를 준비합니다. 아래 명령은 프로젝트 루트에서 실행합니다. 작은 텍스트 full·LoRA는 CPU에서도 가능하며, VLM은 모델 크기와 processor 메모리를 확인하고 CUDA를 권장합니다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay를 선택합니다.
 
 하나의 원본 예제에서 아래 두 표현을 만듭니다.
 
@@ -186,3 +182,12 @@ Full 결과는 모델 safetensors·tokenizer·config와 `training_metadata.json`
 - 일반 instruction replay를 10%·30% 섞고 도메인 QA와 지시 준수 변화량을 비교하십시오.
 - Spark CUDA의 OOM/속도 문제라면 batch-size를 줄이고 max-length를 줄인 다음 작은 subset으로 확인하십시오. Full float32 Adam 메모리는 모델 크기 외에도 gradient·optimizer 상태·activation을 포함합니다. BF16 autocast는 parameter와 Adam 상태 메모리를 줄이지 않습니다.
 - 문서에 날짜·버전이 있는 사실이라면 train metadata에 유효 시점을 남기고, 잦은 갱신이 필요한 데이터는 RAG와 함께 비교하십시오.
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: CPT 문서 loss와 QA 정답률을 구분하고, 학습한 사실 회상·새 사실·기존 instruction 보존을 각각 해석합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. 다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

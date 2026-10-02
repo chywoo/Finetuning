@@ -6,7 +6,7 @@
 
 HF의 C4/S4/K3를 묶은 [Domain 주 수업](../../04_post_training/domain_huggingface/README.md)에서 시작합니다. CPT만/QA만/CPT→QA를 비교한 뒤 [DPO 수업](../../04_post_training/dpo_huggingface/README.md)으로 이동합니다. 다른 도구/기법은 선택 비교입니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
 이 실습은 이미 instruction tuning을 받은 `HuggingFaceTB/SmolLM2-135M-Instruct`에 과학 분야 텍스트와 질문·정답을 추가로 학습한다. 동일한 데이터에서 **CPT만**, **SFT만**, **CPT 다음 SFT**를 비교하여 각 학습 목표의 차이를 이해한다. 기본 모델은 작고 데이터도 일부만 사용하므로 품질을 보장하는 결과가 아니라 실습용 파이프라인이다.
 
@@ -77,7 +77,7 @@ Unsloth는 모델과 커널을 최적화하고 TRL `SFTTrainer`가 학습 루프
 
 ## 4. 실행 환경과 작은 데이터 확인
 
-대상 장비는 **NVIDIA DGX Spark: Linux ARM64(`aarch64`), Blackwell compute capability 12.1 (`sm_121`)**이다. [DGX Spark 실행 가이드](../../docs/04_dgx_spark.md)의 컨테이너·드라이버 절차를 먼저 따른다. GPU 학습·처리량·커널 호환성은 아직 실제 실행으로 확인하지 않았다. Instruction 실습에서 같은 Spark 컨테이너 환경을 준비했다면 그 환경을 그대로 사용한다.
+Unsloth는 지원되는 Linux NVIDIA CUDA 환경에서 별도 가상환경으로 설치한다. [공식 설치 안내](https://unsloth.ai/docs/get-started/install-and-update)에 따라 GPU·PyTorch·Triton·bitsandbytes 조합을 확인한다. 본 수업의 학습 코드 기준은 TRL 0.24.0과 Transformers 4.57.6이므로 다른 버전의 예제를 섞지 않는다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay 절차를 선택한다.
 
 ```bash
 # DGX Spark 호스트의 저장소 루트
@@ -87,7 +87,7 @@ bash scripts/install_spark.sh unsloth
 source .venv-spark-unsloth/bin/activate
 ```
 
-Spark용 NGC **25.11-py3** 이미지의 PyTorch/CUDA/Triton을 유지한다. 설치 스크립트는 constraints와 `requirements/spark-unsloth.txt`를 적용하여 `unsloth==2026.9.14`, `trl==0.24.0`, `transformers==4.57.6`, `datasets==4.3.0`, `peft==0.18.1`, `bitsandbytes==0.48.2` overlay를 설치한다. 호스트에 일반 PyTorch wheel을 설치하거나 컨테이너 torch를 자동 교체하는 경로를 사용하지 않는다. ARM64 bitsandbytes·Blackwell 커널 확인은 공통 Spark 가이드를 따른다. SmolLM2 135M에서는 양자화 준비 비용이 이점보다 클 수 있으므로 4bit와 16bit LoRA의 시간·메모리를 실제로 비교한다.
+Spark를 선택하면 NGC의 PyTorch/CUDA/Triton을 유지하고 `requirements/spark-unsloth.txt` overlay를 사용한다. 일반 환경에서는 공식 지원 조합을 별도 확인한다. SmolLM2 135M에서는 양자화 준비 비용이 이점보다 클 수 있으므로 4bit와 16bit LoRA의 시간·메모리를 실제로 비교한다.
 
 ### 다운로드 없는 준비 점검
 
@@ -97,7 +97,7 @@ python 02_knowledge/unsloth/train.py --stage cpt --data-dir data/demo/knowledge_
 python 02_knowledge/unsloth/train.py --stage sft --data-dir data/demo/knowledge_sft --dry-run
 ```
 
-Demo는 가상의 우주 정거장 코드로 만든 fixture다. 실행과 누수 점검용이며 모델 성능 지표로 쓰지 않는다. Spark 컨테이너에서 dry-run은 train/validation/test 전체를 읽어 ID·내용 누수를 검증하고, 모델 가중치나 Unsloth는 로딩하지 않는다. Test는 누수 확인에만 읽으며 학습과 validation loss에 사용하지 않는다. Dry-run으로 GPU 커널 지원을 판정하지 않는다.
+Demo는 가상의 우주 정거장 코드로 만든 fixture다. 실행과 누수 점검용이며 모델 성능 지표로 쓰지 않는다. 어떤 환경에서도 dry-run은 train/validation/test 전체를 읽어 ID·내용 누수를 검증하고, 모델 가중치나 Unsloth는 로딩하지 않는다. Test는 누수 확인에만 읽으며 학습과 validation loss에 사용하지 않는다. Dry-run으로 GPU 커널 지원을 판정하지 않는다.
 
 ### 실제 SciQ 데이터 준비
 
@@ -205,3 +205,12 @@ Validation이 악화되면 step/learning rate/rank를 줄이고, train loss만 �
 mkdir -p outputs
 python -m pip freeze > outputs/unsloth_environment.txt
 ```
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: CPT 문서 loss와 QA 정답률을 구분하고, 학습한 사실 회상·새 사실·기존 instruction 보존을 각각 해석합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. Unsloth 경로는 선택 확장이므로 지원 환경이 없으면 미실행으로 남기고 주 경로를 진행합니다.다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

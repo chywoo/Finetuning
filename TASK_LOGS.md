@@ -298,3 +298,14 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - 잔여 환경 조건: Unsloth 2026.9.14는 torch `<2.13`을 요구하여 기존 torch 2.14.1과 의존성 해결이 불가능했다. 별도 호환 환경이 필요하며 native import/kernel 성공으로 기록하지 않는다. `uv pip check`는 기존 `nvidia-cusparselt-cu13==0.8.1` 공급 wheel tag를 지원하지 않는다고 보고했다. 별도 환경에 같은 버전을 재설치해도 경고가 남았다. 해당 공유 라이브러리 로딩과 dense CUDA 연산은 성공했지만 sparse kernel 검증을 대신하지 않는다. 원래 런타임을 임의 교체하지 않았다.
 - 정적 확인: Python 51개 AST 및 800줄 제한, 수업 문서 로컬 링크, shell 문법, `git diff --check` 통과. 기본 `graft build --no-gitignore --no-ignore`로 51개 카드를 재생성했다. 원격 LLM pass·키 사용은 없었다.
 - 실습 학습 완료는 여전히 0/34이다. 구현·빠른 검증 milestone을 `fix: harden portable lab validation and checkpoint safety`로 local commit하고, 교육 문서·집계는 별도 문서 milestone에 반영한다.
+
+### 2026-10-02 11:44:14 EDT — 교육 자료·전체 진행 정합성 확인 완료
+
+- 구현·회귀검증 commit `ec14300`을 확인했다. 사용자가 별도로 기록한 `99a3ace`의 지침·패키지 변경을 보존했다. 교육 보완은 일반 환경의 빠른 시작과 각 대상/방법의 선수·이론·데이터·실행·결과물·완료 기준·다음 수업에 반영했다.
+- 일반 HF/post와 Unsloth의 고정 requirements를 분리했다. Spark는 선택 환경으로 안내하며 특정 내부 장비·개인 절대 경로·비밀 값은 새 문서에 기록하지 않았다. 설정 선택에 test 비교를 권하던 문구를 validation으로 정정했다.
+- 전체 case ID I1–I7/C1–C7/S1–S7/K1–K6/V1–V3/P1–P4의 `--dry-run` 34/34가 오프라인·30초 제한 내 종료 코드 0으로 통과했다. K/P의 실제 선수 checkpoint와 kernel은 이 검사에서 검증하지 않았다. Reward/PPO는 데이터 검사와 실제 모델 선수 조건을 분리한 회귀 수정으로 통과했다.
+- 추가 비학습 확인: 임의 초기화 tiny GPT-2 CUDA forward의 유한 logits, optimizer update 0, `outputs/readiness/offline-model` 저장 뒤 별도 subprocess 평가 종료 코드 0/2개 예시. 근거: `outputs/readiness/offline-reload.json`. 해당 생성·loss를 학습 성능으로 해석하지 않는다.
+- README를 시작 길잡이로 정리하고 `docs/13_readiness.md`에 요청별 제공 과정·실제 근거·재현 명령·환경 제약을 작성했다. 커리큘럼·체크리스트·검증 상태·코드 지도를 함께 갱신했다. 준비 34/34, 빠른 CLI 검사 34/34, 실제 학습 완료 0/34, 추가 과제 0/11을 구분한다.
+- 최종 문서 확인: Markdown 32개 로컬 링크/코드 fence 정상, case ID 34개·중복 없음, coverage 81.56%와 skipped 학습 검사 표기 일치, `git diff --check` 통과. 학습·큰 모델 다운로드·원격 작업은 실행하지 않았다.
+- Unsloth 의존성 충돌과 공급 wheel tag 검사 경고는 해소한 것으로 표시하지 않았다. 실제 학습·성능 비교·native 전체 matrix는 사용자 조건상 이번 구축 작업의 완료 범위에 포함하지 않는다.
+- 교육·진행 문서 milestone을 `docs: complete staged lab guide and verification status`로 local commit한다. 캐시·데이터·가상환경·모델/검사 출력은 commit에 넣지 않는다.

@@ -6,7 +6,7 @@
 
 Post-training의 확률/loss·보상 수업을 마친 뒤 PyTorch V1 → HF V2 순으로 진행합니다. Unsloth V3는 다른 모델을 사용하는 선택 확장입니다. 완료하면 [추가 비교 과제](../../docs/08_next_experiments.md)로 이동합니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
 이 경로는 `Qwen/Qwen2.5-VL-3B-Instruct`에 콩 잎 분류 과제를 학습한다.
 이미지+질문을 입력하면 `angular_leaf_spot`, `bean_rust`, `healthy` 중 하나를
@@ -67,17 +67,11 @@ rank 8, alpha 16을 사용한다. 고정된 시각 표현을 새 라벨과 연�
 데이터 카드의 라이선스는 명확하게 지정되어 있지 않으므로 배포·상업 사용 전에
 원 출처의 조건을 확인하고 임의로 CC-BY라고 표기하지 않는다.
 
-## 3. NVIDIA CUDA 환경 준비
+## 3. 지원되는 NVIDIA CUDA 환경 준비
 
-이 저장소의 실제 실행 장치는 **DGX Spark의 ARM64/GB10 CUDA**다.
-먼저 [공통 DGX Spark 환경 문서](../../docs/04_dgx_spark.md)와
-[NVIDIA Unsloth playbook](https://build.nvidia.com/spark/unsloth)을 따라
-Spark용 Docker 환경을 만든다. 일반 x86 CUDA wheel이나
-다른 GPU용 컨테이너가 GB10/ARM64에서도 그대로 동작한다고 가정하지 않는다.
-공통 설치 스크립트는 playbook의 NGC 환경을 기준으로 Unsloth dependency를 구성한다.
-Unified memory는 CPU/GPU가 공유하므로 전체 메모리 사용량도 함께 확인한다.
+Unsloth는 지원되는 Linux NVIDIA CUDA 환경에서 별도 가상환경으로 설치한다. [공식 설치 안내](https://unsloth.ai/docs/get-started/install-and-update)에 따라 GPU·PyTorch·Triton·bitsandbytes 조합을 확인한다. 본 수업의 학습 코드 기준은 TRL 0.24.0과 Transformers 4.57.6이므로 다른 버전의 예제를 섞지 않는다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay 절차를 선택한다.
 
-PyTorch/HF 실습과 분리한 Unsloth 컨테이너를 사용한다. 아래 명령은 준비한
+PyTorch/HF 실습과 분리한 Unsloth 환경을 사용한다. 아래 컨테이너 절차는 Spark를 선택했을 때만 적용한다. 아래 명령은 준비한
 컨테이너 안에서 저장소 최상위 디렉토리를 기준으로 실행한다. 기존 CUDA
 PyTorch를 pip로 덮어쓰지 않고 공식 이미지의 dependency 조합을 유지한다.
 호스트에서 `bash scripts/spark_container.sh unsloth`를 실행하고 컨테이너 안에서
@@ -163,3 +157,12 @@ Train loss가 감소해도 이미지 분류가 개선된다는 보장은 없으�
 그때는 학습 범위, VRAM, 일반 이미지 질문의 성능을 함께 기록한다. 사용자
 도메인으로 확장할 때는 정상/이상 클래스, 촬영 기기·조명, 데이터 누수,
 annotation 품질을 먼저 점검하고 실제 이미지들을 독립적인 test로 남겨 둔다.
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: 동일 이미지와 prompt의 accuracy·macro-F1·invalid 출력 및 클래스별 오분류를 비교합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. Unsloth 경로는 선택 확장이므로 지원 환경이 없으면 미실행으로 남기고 주 경로를 진행합니다.다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

@@ -6,9 +6,9 @@
 
 HF의 C4/S4/K3를 묶은 [Domain 주 수업](../../04_post_training/domain_huggingface/README.md)에서 시작합니다. CPT만/QA만/CPT→QA를 비교한 뒤 [DPO 수업](../../04_post_training/dpo_huggingface/README.md)으로 이동합니다. 다른 도구/기법은 선택 비교입니다.
 
-이 수업의 준비물은 데이터 split/manifest, 출발 모델, Spark CUDA 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
+이 수업의 준비물은 데이터 split/manifest, 출발 모델, 방법에 맞는 실행 환경과 baseline입니다. 아래 데이터·환경·실행 절차를 순서대로 읽고 학습→저장→별도 재로딩→전후 비교를 확인한 후 다음 단계로 이동합니다. [체크리스트](../../docs/10_practice_checklist.md)의 해당 ID와 TASK_LOGS를 갱신합니다.
 
-이 폴더는 기존 LLM에 도메인 텍스트를 학습시키는 **continued pretraining(CPT)**과, 질문에 지식을 꺼내 답하는 **QA supervised fine-tuning(SFT)**을 분리합니다. 기본 모델은 이미 instruction learning을 거친 `HuggingFaceTB/SmolLM2-135M-Instruct`입니다. 실행 대상은 **DGX Spark ARM64 Linux + NVIDIA CUDA**입니다. 먼저 각 단계를 단독으로 비교하고, 필요하면 CPT → SFT 순서로 연결하세요.
+이 폴더는 기존 LLM에 도메인 텍스트를 학습시키는 **continued pretraining(CPT)**과, 질문에 지식을 꺼내 답하는 **QA supervised fine-tuning(SFT)**을 분리합니다. 기본 모델은 이미 instruction learning을 거친 `HuggingFaceTB/SmolLM2-135M-Instruct`입니다. PyTorch/HF 실습은 일반 Linux CUDA 환경을 권장합니다. 먼저 각 단계를 단독으로 비교하고, 필요하면 CPT → SFT 순서로 연결하세요.
 
 ## 1. 지식 학습의 두 가지 목적
 
@@ -70,14 +70,10 @@ SciQ의 과학 사실은 원래 모델의 사전학습 데이터에 이미 들�
 
 ## 4. 환경과 데이터 준비
 
-아래 명령은 DGX Spark의 저장소 루트에서 실행합니다. 먼저 [DGX Spark 환경 안내](../../docs/04_dgx_spark.md)의 Hugging Face 컨테이너를 준비하세요. `requirements/spark-hf.txt`는 NVIDIA의 ARM64 PyTorch/CUDA 환경을 유지합니다.
+일반 환경은 [빠른 시작](../../docs/00_quickstart.md)의 `.venv-lab`과 `requirements/lab-hf.txt`를 준비합니다. 아래 명령은 프로젝트 루트에서 실행합니다. 작은 텍스트 full·LoRA는 CPU에서도 가능하며, VLM은 모델 크기와 processor 메모리를 확인하고 CUDA를 권장합니다. DGX Spark 사용자는 [전용 환경 안내](../../docs/04_dgx_spark.md)의 NGC overlay를 선택합니다.
 
 ```bash
-# DGX Spark host에서 실행
-bash scripts/spark_container.sh hf
-# 열린 컨테이너 안에서 실행
-bash scripts/install_spark.sh hf
-source .venv-spark-hf/bin/activate
+source .venv-lab/bin/activate
 python -m finetune_lab.prepare_data --task knowledge --source hf --train-samples 256 --eval-samples 32
 python 02_knowledge/huggingface/train.py --stage cpt --dry-run
 python 02_knowledge/huggingface/train.py --stage sft --dry-run
@@ -87,7 +83,7 @@ python 02_knowledge/huggingface/train.py --stage sft --dry-run
 
 ## 5. 실험 A: QA SFT만 수행
 
-학습 전에는 같은 test 질문을 baseline 모델에 물어봅니다.
+설정을 선택할 때는 같은 validation 질문을 baseline과 학습 모델에 물어봅니다. test는 최종 비교용으로 남깁니다.
 
 ```bash
 python -m finetune_lab.evaluate --device cuda --model HuggingFaceTB/SmolLM2-135M-Instruct --data-dir data/processed/knowledge_sft --kind sft --output outputs/knowledge_hf_baseline_qa.json
@@ -162,7 +158,7 @@ CUDA_VISIBLE_DEVICES=0 python 02_knowledge/huggingface/train.py --stage cpt --da
 CUDA_VISIBLE_DEVICES=0 python 02_knowledge/huggingface/train.py --stage sft --data-dir data/demo/knowledge_sft --model outputs/knowledge_hf_cpt_smoke --method full --device cuda --max-steps 2 --max-length 64 --gradient-accumulation 1 --output-dir outputs/knowledge_hf_sft_smoke
 ```
 
-첫 단계의 임의 초기화 모델은 사전학습 LLM이 아닙니다. offline smoke는 저장·재로드·학습 연결 검증용이며 의미 있는 지식 학습 결과를 주장하는 용도가 아닙니다. Spark CUDA 실행과 coverage 80% 달성은 아직 확인되지 않았습니다. 사전학습 모델로 같은 demo를 반복하면 작은 신규 사실 실험을 할 수 있으나, 적은 샘플의 결과는 매우 불안정합니다.
+첫 단계의 임의 초기화 모델은 사전학습 LLM이 아닙니다. offline smoke는 저장·재로드·학습 연결 검증용이며 의미 있는 지식 학습 결과를 주장하는 용도가 아닙니다. 실제 실행·coverage 상태는 [검증 기록](../../docs/07_validation.md)을 확인합니다. 사전학습 모델로 같은 demo를 반복하면 작은 신규 사실 실험을 할 수 있으나, 적은 샘플의 결과는 매우 불안정합니다.
 
 ## 9. QLoRA, 저장, 문제 해결
 
@@ -174,7 +170,7 @@ CUDA_VISIBLE_DEVICES=0 python 02_knowledge/huggingface/train.py --stage sft --me
 
 QLoRA에서는 base를 NF4로 양자화하고 학습 가능한 LoRA만 업데이트합니다. Spark의 ARM64 bitsandbytes/CUDA 호환성을 루트 환경 점검 단계에서 확인하세요. 더 큰 모델로 바꾸려면 먼저 모델 라이선스, tokenizer 형식, GPU 메모리를 확인하고 `--model`로 지정합니다.
 
-`training_metadata.json`에는 base 모델, revision, stage, method, prompt 형식, 실제 데이터 수, seed, 학습 전후 validation loss, GPU/CUDA/패키지 버전이 저장됩니다. full은 전체 가중치, LoRA/QLoRA는 adapter를 저장합니다. `--revision`에 commit SHA를 넣고 데이터 revision도 고정하면 이후 재현하기 쉬워집니다.
+`training_metadata.json`에는 base 모델, revision, stage, method, prompt 형식, 실제 데이터 수, seed, 학습 전후 validation loss와 재현에 필요한 CUDA/패키지 버전이 저장됩니다. 내부 장비 식별 정보와 비밀 값은 제외합니다. full은 전체 가중치, LoRA/QLoRA는 adapter를 저장합니다. `--revision`에 commit SHA를 넣고 데이터 revision도 고정하면 이후 재현하기 쉬워집니다.
 
 | 문제 | 확인할 항목 |
 |---|---|
@@ -186,3 +182,12 @@ QLoRA에서는 base를 NF4로 양자화하고 학습 가능한 LoRA만 업데이
 | GPU memory 부족 | batch-size/max-length 감소, LoRA/QLoRA, accumulation 증가 |
 
 빠르게 바뀌는 지식, 문서별 출처, 접근 권한이 중요하면 RAG와 함께 비교하세요. finetuning은 파라미터를 바꾸며 정확한 문서 조회나 최신 정보 갱신을 보장하지 않습니다. 지식 업데이트의 목표가 답변 스타일인지, 도메인 용어 적응인지, 특정 사실 회수인지 먼저 정하면 적절한 데이터를 선택하기 쉽습니다.
+
+## 수업 완료 기준
+
+1. 준비: 세 split과 manifest를 확인하고 dry-run의 데이터 수·모델·학습 방법을 설명합니다.
+2. 실행: 실제 학습이 유한 loss로 종료되고 예상한 전체 모델 또는 adapter·tokenizer·metadata가 새 출력 경로에 저장됩니다.
+3. 재사용: 별도 프로세스에서 저장 결과를 읽어 답변을 생성합니다. Adapter이면 동일 base와 revision을 사용합니다.
+4. 해석: CPT 문서 loss와 QA 정답률을 구분하고, 학습한 사실 회상·새 사실·기존 instruction 보존을 각각 해석합니다. 설정을 고른 뒤 test를 최종 평가합니다.
+
+실행 성공과 품질 개선은 각각 기록합니다. 수업을 준비했거나 dry-run만 통과한 상태를 학습 완료로 표시하지 않습니다. 다음 단계는 이 문서 첫머리의 수업 경로와 [커리큘럼](../../docs/11_curriculum.md)을 따릅니다.

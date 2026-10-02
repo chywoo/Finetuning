@@ -17,12 +17,9 @@
 현재 저장 데이터: CPT 232/29/31, QA 255/32/32 (train/validation/test). 빈 support나 중복 때문에 두 데이터의 수는 다릅니다. 상세 revision·라이선스·schema는 [데이터 안내](../../docs/02_datasets.md)를 확인합니다. SciQ는 CC BY-NC 3.0입니다.
 
 ```bash
-# Spark 호스트
-bash scripts/spark_container.sh post
-# 컨테이너 내부
-bash scripts/install_spark.sh post
-source .venv-spark-post/bin/activate
-python scripts/doctor.py --require-spark
+source .venv-lab/bin/activate
+python -m pip install -r requirements/lab-post.txt
+python scripts/doctor.py --require-cuda --profile post
 # data/processed/knowledge_*가 이미 있으면 아래 다운로드는 생략
 python -m finetune_lab.prepare_data --task knowledge --source hf
 python 04_post_training/domain_huggingface/train.py --stage cpt --method lora --dry-run
@@ -104,4 +101,3 @@ SciQ는 공개된 과학 지식이라 pretrained 모델이 이미 봤을 수 있
 - [ ] [체크리스트](../../docs/10_practice_checklist.md)의 C4/S4/K3와 TASK_LOGS를 갱신했다.
 
 DPO는 선호 데이터와 맞는 SFT 출발점이 필요합니다. Domain 모델을 반드시 연결하지 말고 별도 instruction SFT full checkpoint 또는 merge 결과를 사용합니다. Domain adapter를 전체 모델로 내보내는 방법은 `python -m finetune_lab.merge --adapter ... --output-dir ...`이며 정확한 옵션은 기존 merge 안내를 확인합니다.
-

@@ -13,13 +13,12 @@ DPO와 PPO는 같은 SFT 출발점의 대안입니다. DPO 모델을 PPO에 반�
 
 도구는 HF Transformers/PEFT + TRL 한 경로로 제공합니다. 선택 근거와 실제 연구 사례는 [실습 계획](../docs/11_curriculum.md)에 기록했습니다.
 
+일반 환경 설치는 [빠른 시작](../docs/00_quickstart.md)을 따릅니다. 아래 설치·doctor는 모델 학습을 시작하지 않습니다. Spark를 선택하면 [전용 설치 안내](../docs/04_dgx_spark.md)의 post profile을 사용합니다.
+
 ```bash
-# Spark 호스트
-bash scripts/spark_container.sh post
-# 컨테이너 내부
-bash scripts/install_spark.sh post
-source .venv-spark-post/bin/activate
-python scripts/doctor.py --require-spark
+source .venv-lab/bin/activate
+python -m pip install -r requirements/lab-post.txt
+python scripts/doctor.py --require-cuda --profile post
 ```
 
 TRL은 0.24.0으로 고정합니다. 각 실습의 dry-run/평가/학습 명령은 해당 README를 따릅니다. 기존 validate_spark.py는 이 post-training 학습 성공을 검증하지 않습니다. CUDA 실제 수행과 품질 향상은 아직 확인하지 않았습니다.

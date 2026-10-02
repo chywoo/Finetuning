@@ -79,8 +79,10 @@ validation에서 설정을 결정한 후 test 전체로 마지막 평가합니�
 | 모델 | ID + revision SHA, adapter의 원래 base |
 | 데이터 | manifest SHA, split, sample 수 |
 | 학습 | seed, steps, batch, accumulation, LR, max_length, precision |
-| 환경 | NGC image digest, ARM64, PyTorch/CUDA/Unsloth versions |
+| 환경 | Python/PyTorch/CUDA/학습 도구 버전, dtype; 사용 시 공개 컨테이너 image tag |
 | 품질 | baseline와 after 지표, 실패 예제 |
 | 비용 | 시간, 실제 token 수, CUDA allocated/reserved peak, 시스템 RAM |
+
+장비 식별 정보·사용자 디렉토리·내부 절대 경로·비밀 값은 문서나 공유 보고서에 기록하지 않습니다. 경로는 프로젝트 루트 기준 상대 경로를 사용합니다.
 
 큰 실험은 한 변수를 바꿔 여러 seed로 반복해 분산도 보고합니다. 통합 메모리 Spark에서는 GPU와 CPU가 같은 RAM을 사용하므로 peak CUDA memory 하나만으로 총 메모리 사용을 판단하지 않습니다.
