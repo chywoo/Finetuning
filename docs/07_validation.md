@@ -2,6 +2,18 @@
 
 ## 현재 상태
 
+### 사용자 요청 HF/VLM 짧은 실행 — 2026-10-02 15:42 EDT
+
+프로젝트 루트에서 `source .venv/bin/activate` 후 `timeout 180 python scripts/validate_spark.py --profile hf --include-vision`을 실행했다. 종료 코드 0, `results.json`의 상태 `passed`, 16단계 모두 종료 코드 0을 확인했다. 근거는 `outputs/spark_validation/20261002T194113Z-hf/`의 단계별 로그와 보고서다.
+
+- CUDA/BF16 forward/backward, tiny text SFT·CPT, HF full·LoRA 연결·merge·재로딩을 확인했다.
+- VLM PyTorch와 HF의 실제 1-step 학습·저장·재로딩이 통과했다. HF VLM 학습 시간은 로그 기준 1.3608초다.
+- 사용자가 지정한 `nvidia-smi --query-gpu=utilization.gpu`를 실행 중 여러 번 조회해 0%와 3%를 관측했다. 순간 조회는 짧은 연산을 놓칠 수 있으며, 이 검증은 지속 부하 측정이 아니다.
+- 텍스트는 임의 초기화 tiny model의 2-step, VLM은 demo 이미지의 1-step 검사다. 실제 공개 데이터 품질 비교, Unsloth/QLoRA, post-training과 전체 실습 완료를 뜻하지 않는다. 기존 pytest/coverage 결과도 이번에 재실행하지 않았다.
+- VLM 로그에는 HF cache의 선택 파일 부재 기록 권한 경고와 API deprecation 경고가 남았지만 단계는 성공했다. 권한이나 패키지는 변경하지 않았다.
+
+아래 미실시 설명과 시간별 결과는 이 실행 이전의 기록이다. 이번 명시적 요청으로 짧은 학습 검증만 수행했으며 장시간 학습 제한은 유지한다.
+
 최종 구현·교육 보완 및 빠른 검증은 [구축 완료와 실행 범위](13_readiness.md)를 기준으로 합니다. **172 passed, 학습 integration 2 skipped, 전체 coverage 81.56%**입니다. 아래 시간별 검사는 이전 시점의 이력이며, 최초 미설치 의존성은 별도 `.venv-lab`에 준비했습니다. Unsloth runtime 충돌과 공급 wheel tag 경고는 완료 문서에 구분했습니다.
 
 새 post-training 범위는 [실습 계획](11_curriculum.md)과 [체크리스트](10_practice_checklist.md)의 P1–P4를 따른다. Domain은 기존 HF CPT/QA 경로를 재사용한다. DPO/Reward/PPO/GRPO는 post overlay에서 각각 학습·저장·별도 재로딩·독립 평가를 실행해야 하며, 아래 기존 HF/Unsloth matrix에 포함된 것으로 표시하지 않는다.

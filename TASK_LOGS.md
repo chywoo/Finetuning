@@ -317,3 +317,12 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - Linux CUDA·DGX Spark·Apple Silicon·Intel macOS 안내를 환경 준비 섹션에 모았다. Intel Mac의 공식 PyTorch 2.2.x/2.2.2 바이너리 제한과 미검증 실행 범위를 명시하고 공식 출처 링크를 유지했다.
 - 문서 로컬 링크·코드 fence·제거 문구와 `git diff --check`를 확인했다. Ruby 검사 도구가 없어 Python 표준 라이브러리로 문서 검사만 수행했다. ML import·pytest·설치·다운로드·학습은 실행하지 않았다.
 - 문서만 변경하여 실습 완료 집계 0/34는 바꾸지 않았다. `docs: rewrite README as a friendly learning guide`로 local commit한다.
+
+### 2026-10-02 15:42:24 EDT — 사용자 요청 HF/VLM 실행 및 GPU 사용률 확인
+
+- 사용자 지정 `.venv`에서 `timeout 180 python scripts/validate_spark.py --profile hf --include-vision`을 실행했다. 짧은 실제 학습을 명시적으로 요청한 범위만 수행했다.
+- 결과: 종료 코드 0, 16단계 모두 성공. CUDA/BF16 forward/backward, tiny text 2-step SFT/CPT, HF full/LoRA·merge·재로딩, PyTorch/HF VLM 1-step·저장·재로딩 통과. 근거: `outputs/spark_validation/20261002T194113Z-hf/results.json`과 단계 로그.
+- 실행 중 `nvidia-smi --query-gpu=utilization.gpu` 조회에서 0%와 3%를 관측했다. HF VLM train runtime은 1.3608초로 짧았고 지속 GPU 부하 검증은 아니다. GPU 미사용으로 단정할 근거는 없다.
+- HF cache의 선택 파일 부재 기록 권한 경고와 deprecated API 경고가 있었지만 검증은 성공했다. 패키지 설치·권한 변경·장시간 학습·pytest는 실행하지 않았다.
+- 검증 문서와 선행 체크리스트의 해당 CUDA/HF/vision 단계를 갱신했다. 공개 데이터 baseline/품질 비교가 없어 실제 실습 완료 0/34는 유지한다. Unsloth/QLoRA/post-training은 미확인이다.
+- 기존 사용자 변경 `scripts/install_spark.sh`, `scripts/spark_container.sh`는 보존하고 commit에서 제외한다. 문서만 `docs: record requested HF vision validation`로 local commit한다.
