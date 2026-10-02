@@ -65,10 +65,10 @@ PyTorch는 직접 작성한 loop를 뜻하며 모델 로딩에는 HF를 사용�
 - [x] AGENTS.md에 저장소·필요 SKILL·Graft·시간별 기록 규칙 작성.
 - [ ] Spark post overlay 설치 및 DPO/Reward/PPO/GRPO별 실행 확인.
 - [ ] Spark 호스트에서 NGC image 준비 및 HF overlay 설치 성공.
-- [x] Spark에서 `doctor --require-spark` CUDA/BF16 확인 성공: 2026-10-02 사용자 요청 실행, [검증 근거](07_validation.md).
-- [x] Spark HF profile 통합 검증 성공: tiny/demo 짧은 실행 16단계 통과; 실제 데이터 품질 검증과 구분.
+- [ ] Spark에서 `doctor --require-spark` CUDA/BF16 확인 성공.
+- [ ] Spark HF profile 통합 검증 성공.
 - [ ] Spark Unsloth overlay 설치와 profile 통합 검증 성공.
-- [x] Spark에서 선택적 vision 통합 검증 성공: PyTorch/HF VLM 1-step·저장·재로딩 통과; Unsloth는 제외.
+- [ ] Spark에서 선택적 vision 통합 검증 성공.
 - [ ] 실제 학습 integration 및 native CUDA/Unsloth/QLoRA/VLM 전체 matrix 확인.
 
 짧은 환경 검사 결과와 다음 준비 항목은 [검증 상태](07_validation.md)를 따른다. Spark profile을 사용하는 경우 설치는 [DGX Spark 안내](04_dgx_spark.md)를 따른다.

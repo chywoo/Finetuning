@@ -1,117 +1,215 @@
-# 순서대로 배우는 fine-tuning / post-training 실습 계획
+# 차근차근 배우는 Fine-tuning과 Post-training
 
-교육 자료·구현 보완과 학습 없는 빠른 검증을 완료했습니다. 모델 학습과 오래 걸리는 실행은 제외했으며 아래 학습 절차는 이후 실습 계획입니다. 작성된 코드, 현재 데이터 가용성, 실제 수행 상태는 [구축 완료 범위](13_readiness.md)와 체크리스트에서 구분합니다.
+이 과정에서는 작은 모델을 직접 학습시키면서 **데이터 준비 → 학습 → 저장 → 다시 불러오기 → 결과 비교**까지 경험해 봅니다.
 
-이 문서는 **무엇을 먼저 배우고, 어떤 결과를 확인한 후 다음 단계로 갈지** 정한다. [전체 체크리스트](10_practice_checklist.md)는 모든 도구/기법 조합의 진행표다. 처음부터 34개 조합을 한꺼번에 실행하지 않고 아래 주 경로를 한 단계씩 진행한다. 선택 비교는 주 경로를 이해한 뒤 수행한다.
+처음부터 모든 방법을 실행할 필요는 없습니다. 아래 대표 실습을 하나씩 따라가며 흐름을 익힌 뒤, 관심 있는 도구와 방법으로 넓혀 가세요. 전체 선택 실습은 [체크리스트](10_practice_checklist.md)에서 확인할 수 있습니다.
 
-## 교육 목표와 난이도
+## 처음부터 수식을 잘 알아야 하나요?
 
-- 입문(고등학생): Python 함수/명령어/JSONL을 읽고, 토큰·정답 점수·모델 저장을 말로 설명한다. 미적분을 선수 지식으로 요구하지 않는다.
-- 중간(대학 초반): 확률, 평균, 로그를 이용해 loss·batch·LoRA 메모리·데이터 누수를 계산한다.
-- 심화(대학 수준): 조건부 확률, 미분/gradient, 기대값을 이용해 preference loss·KL·policy gradient·PPO clipping·GRPO advantage를 해석한다.
-- 수식은 먼저 작은 예와 설명을 제공한 후 도입한다. 코드가 실행되어도 사람이 판단한 답변 품질이 향상되지 않을 수 있음을 모든 단계에서 확인한다.
+그렇지 않습니다. 처음에는 Python 함수와 명령어, JSONL 파일을 읽을 수 있으면 됩니다. 미적분을 미리 공부하고 시작할 필요도 없습니다.
 
-[입문 수업](12_foundations.md)은 첫 단계의 선수 지식과 손계산, [이론](01_theory.md)은 중간 이후 참고 자료다. 기존 README의 수식부터 먼저 외울 필요는 없다.
+설명은 다음 순서로 조금씩 깊어집니다.
 
-## Post-training 구현 도구 선택
+- **입문:** 토큰, loss, 모델 저장을 쉬운 예제와 작은 계산으로 알아봅니다.
+- **중간:** 확률과 평균, 로그를 이용해 학습 방식과 데이터 누수를 살펴봅니다.
+- **심화:** gradient, KL, advantage 등을 학습 코드와 연결해 이해합니다.
 
-추가 과정은 **Hugging Face Transformers/PEFT + TRL** 한 경로로 작성한다. Domain은 Trainer/PEFT의 LoRA, DPO는 DPOTrainer+LoRA, RLHF는 RewardTrainer→PPOTrainer, RLVR는 GRPOTrainer+LoRA를 사용한다.
+처음에는 [입문 수업](12_foundations.md)을 읽어 보세요. 수식이 궁금해지는 단계에서 [이론 설명](01_theory.md)을 참고하면 됩니다. 용어를 모두 외우기보다는 “이 개념이 왜 필요한가?”를 먼저 이해해 보세요.
 
-공개 실제 개발 사례에는 Llama 3의 SFT/DPO, InstructGPT의 reward model/PPO, DeepSeekMath의 GRPO가 있다. 관련 기법을 함께 제공하는 TRL을 재현 가능한 수업 경로로 선택했다. 세 도구의 전 세계 사용량을 비교한 통계가 없으므로 “점유율 1위”라고 단정하지 않는다. [Llama 3](https://arxiv.org/abs/2407.21783), [InstructGPT](https://arxiv.org/abs/2203.02155), [DeepSeekMath](https://arxiv.org/abs/2402.03300), [TRL 공식 저장소](https://github.com/huggingface/trl).
+## 전체 학습 순서
 
-Domain fine-tuning은 별도의 RL 알고리즘이 아니다. 도메인 CPT와 task SFT를 묶은 데이터/목적의 선택이며, 기존 C4/S4/K3 케이스를 재사용한다. CPT는 계속 사전학습 목적, SFT/DPO/RL은 여기서 다루는 post-training 목적이라는 차이를 구분한다.
+| 단계 | 배우는 내용 | 시작할 실습 | 다음 단계로 가기 전에 해 볼 일 |
+|---|---|---|---|
+| 0. 준비 | Python·JSONL·토큰과 실습 환경 | [입문 수업](12_foundations.md), [빠른 시작](00_quickstart.md) | 데이터 한 줄과 train·validation·test의 차이 설명하기 |
+| 1. Instruction SFT | 질문과 답변으로 기본 모델 가르치기 | [I1: PyTorch 전체 학습](../01_instruction/pytorch/README.md) | 모델을 저장하고 다시 불러온 뒤, 학습 전후 답변 3개 비교하기 |
+| 2. LoRA | 작은 adapter만 학습하기 | [I4: Hugging Face LoRA](../01_instruction/huggingface/README.md) | 전체 모델 저장과 adapter 저장의 차이 설명하기 |
+| 3. Domain fine-tuning | 문서 학습과 QA 학습 비교하기 | [C4/S4/K3: HF Domain](../04_post_training/domain_huggingface/README.md) | CPT만, QA만, CPT→QA의 결과와 기존 능력 비교하기 |
+| 4. DPO | 두 답변 사이의 선호 배우기 | [P1: DPO](../04_post_training/dpo_huggingface/README.md) | 선호 쌍과 실제 생성 답변을 각각 평가하기 |
+| 5. Reward modeling | 답변 채점기 만들기 | [P2: Reward model](../04_post_training/rlhf_ppo_huggingface/README.md) | 학습에 쓰지 않은 답변 쌍을 채점하고 길이 편향 살펴보기 |
+| 6. RLHF PPO | 채점기의 보상으로 답변 모델 학습하기 | [P3: PPO](../04_post_training/rlhf_ppo_huggingface/README.md) | 보상, KL, 답변 길이와 실제 답변 품질을 함께 비교하기 |
+| 7. RLVR GRPO | 정답을 검산해 보상 주기 | [P4: GRPO](../04_post_training/rlvr_grpo_huggingface/README.md) | 답변 그룹의 보상 차이와 별도 평가 문제의 정답률 확인하기 |
+| 8. VLM | 이미지와 텍스트 함께 다루기 | [V1: PyTorch](../03_vision/pytorch/README.md) → [V2: HF](../03_vision/huggingface/README.md) | 이미지 처리와 평가 지표를 이해하고 오답 이미지 살펴보기 |
+| 9. 비교와 확장 | 도구·데이터·모델 크기 바꿔 보기 | [선택 실습](10_practice_checklist.md)과 [확장 과제](08_next_experiments.md) | 조건을 맞춰 비교하고 차이가 생긴 이유 정리하기 |
 
-## 한 단계씩 진행하는 주 경로
+이 표는 **공부하는 순서**입니다. 하나의 모델을 모든 단계에 차례로 넣으라는 뜻은 아닙니다.
 
-| 단계 | 난이도 | 대표 실습 | 먼저 준비할 것 | 다음 단계로 가는 조건 |
-|---|---|---|---|---|
-| 0 | 고등학생 | Python·JSONL·토큰·환경 첫 수업 | [입문 수업](12_foundations.md), [빠른 시작](00_quickstart.md) | JSONL 한 줄과 학습/평가 split의 차이를 설명 |
-| 1 | 고등학생 | I1: PyTorch full instruction SFT | Dolly, SmolLM2 base, HF 환경 | 학습→저장→재로딩 후 답변 3개 비교 |
-| 2 | 고등학생→대학 초반 | I4: HF LoRA instruction SFT | 1단계 보고서, 같은 Dolly split | base+adapter와 full checkpoint 차이 설명 |
-| 3 | 대학 초반 | C4/S4/K3: HF domain fine-tuning | SciQ support/QA, 일반 instruction baseline | CPT만/QA만/CPT→QA와 기존 능력 비교 |
-| 4 | 대학 초반 | P1: DPO | SFT/merge checkpoint, chosen/rejected pairs | 선호 쌍 검증, 전후 preference·생성 평가 |
-| 5 | 대학 초반→대학 | P2: reward model | 4단계 데이터/선호 개념 | held-out pair accuracy와 길이 편향 검사 |
-| 6 | 대학 | P3: RLHF PPO | SFT policy와 학습한 reward checkpoint | rollout, KL, reward·길이·생성 품질 비교 |
-| 7 | 대학 | P4: RLVR GRPO | 쉬운 산술 SFT, 독립 test, strict verifier | group reward 다양성과 held-out 정답률 비교 |
-| 8 | 대학 | V1→V2: VLM domain adaptation | Beans images+labels, processor 이해 | image mask와 macro F1/오류 이미지 설명 |
-| 9 | 대학 | 선택 비교/규모 확장 | 앞 단계의 재현 가능한 결과 | 조건을 맞춘 실험표와 실패 원인 기록 |
+- DPO와 PPO는 같은 SFT 모델에서 출발해 비교할 수 있는 두 경로입니다.
+- PPO를 시작하려면 SFT 모델과 reward model이 필요합니다. DPO 모델은 필수가 아닙니다.
+- RLVR는 산술 문제를 먼저 학습한 별도 모델에서 시작합니다.
+- Domain 모델을 선호 학습에 이어 쓴다면, 데이터의 분야와 답변 형식이 잘 맞는지 먼저 살펴보세요.
 
-학습 순서는 설명 순서이며 모델을 무조건 직렬로 이어 붙이는 순서는 아니다. **DPO와 reward→PPO는 동일 SFT 출발점의 대안 분기**다. RLVR는 산술 SFT 출발점의 별도 분기다. Domain checkpoint를 preference 데이터와 이어 사용할 때는 도메인/형식 일치를 먼저 확인한다.
+## 0–2단계: 정답을 보여 주며 가르치기
 
-```mermaid
-flowchart TD
-  A[입문과 환경 준비] --> B[PyTorch SFT]
-  B --> C[HF LoRA SFT와 저장]
-  C --> D[Domain CPT / QA SFT]
-  D --> E[선호 데이터와 DPO]
-  E --> F[Reward model 수업]
-  F --> G[PPO 수업]
-  G --> H[검증 가능한 reward와 GRPO]
-  H --> I[VLM과 확장 비교]
-  C -. 별도 SFT 출발점 .-> E
-  C -. 동일 SFT 대안 분기 .-> G
-  M[산술 SFT 출발점] -.-> H
-```
+먼저 언어 모델을 “문장의 다음 조각을 예측하는 모델”이라고 생각해 보세요. 기본 모델은 문장을 이어 쓸 수 있지만, 질문을 받았을 때 우리가 원하는 방식으로 답하지는 않을 수 있습니다.
 
-## 0–2단계: 정답을 보고 배우기
+Instruction SFT에서는 질문과 원하는 답변을 함께 보여 줍니다. 예를 들어 “기본 색 세 가지를 알려 줘”라는 질문에 “red, blue, yellow”라는 답을 학습시키는 식입니다. 모델이 정답에 높은 확률을 줄수록 loss가 작아집니다.
 
-처음에는 “문장의 다음 조각을 맞히는 기계”로 생각한다. Base 모델에게 질문한다고 항상 답이 나오지 않는다. Instruction SFT는 질문을 주고 원하는 답을 여러 번 보여 준다. 예를 들어 “세 색을 써라”에는 “red, blue, yellow”가 정답이다. 모델이 정답에 높은 확률을 주면 loss가 작아진다.
+다음 순서로 시작해 보세요.
 
-1. [입문 수업](12_foundations.md)에서 토큰·loss·gradient를 작은 숫자로 확인한다.
-2. [빠른 시작](00_quickstart.md)으로 실습 환경을 준비한다. 기존 데이터가 있으면 다운로드 명령은 생략한다.
-3. [I1 PyTorch](../01_instruction/pytorch/README.md)의 full 학습을 실행한다. 기본 20 update는 코드 흐름 확인용이다.
-4. 같은 prompt의 학습 전/후 생성 3개를 표로 적는다. “형식 준수/관련성/정확성”을 각각 판단한다.
-5. [I4 HF LoRA](../01_instruction/huggingface/README.md)로 이동한다. 모델을 모두 바꾸는 대신 작은 추가 행렬만 바꿨다는 차이를 설명한다.
-6. 저장 adapter를 별도 프로세스에서 다시 읽는다. 새 full checkpoint가 필요한 다음 실습에는 merge를 사용하고 base revision을 보존한다.
+1. [입문 수업](12_foundations.md)에서 토큰, loss, gradient를 작은 숫자로 살펴봅니다.
+2. [빠른 시작](00_quickstart.md)을 따라 환경을 준비합니다. 데이터가 이미 있다면 다시 내려받지 않아도 됩니다.
+3. [I1 PyTorch 실습](../01_instruction/pytorch/README.md)으로 직접 작성한 학습 루프를 읽고 실행합니다.
+4. 같은 질문에 대한 학습 전후 답변 3개를 비교합니다. 지시를 지켰는지, 질문과 관련 있는지, 내용이 맞는지 따로 살펴보세요.
+5. [I4 HF 실습](../01_instruction/huggingface/README.md)에서 LoRA를 배웁니다.
+6. 저장한 adapter를 새 프로세스에서 다시 불러옵니다.
 
-대학 초반으로 가는 질문: 응답 token만 loss를 계산하는 이유는 무엇인가? Padding을 정답으로 학습하면 무슨 문제가 생기는가? 같은 optimizer update 수가 같은 학습량을 보장하는가?
+기본 20-step 실행은 학습 흐름을 익히기 위한 출발점입니다. 이 정도 학습으로 답변이 반드시 좋아지는 것은 아닙니다.
 
-## 3단계: Domain fine-tuning
+LoRA에서는 원래 모델 대신 작은 추가 행렬을 학습합니다. 그래서 adapter를 다시 불러올 때도 원래 모델이 필요합니다. 다음 실습에서 전체 모델 파일이 필요하다면 adapter를 합치는 **merge**를 사용하세요. 원래 모델의 버전도 함께 남겨 두어야 합니다.
 
-[Domain 실습](../04_post_training/domain_huggingface/README.md)에서 **과학 문서를 읽게 하기(CPT)**와 **과학 질문에 답하게 하기(QA SFT)**를 분리한다. 일반 instruction 능력을 가진 모델에서 시작한다.
+익숙해졌다면 이런 질문을 생각해 보세요.
 
-실험은 같은 출발 모델의 세 갈래로 진행한다: CPT만, QA SFT만, CPT→QA SFT. CPT→QA가 항상 더 낫다는 가설을 강요하지 않는다. 과학 QA EM/F1, 문서 ppl, 일반 instruction 예시, 학습 시간/메모리를 함께 비교한다. 공개 SciQ가 “처음 보는 지식”이라고 주장하지 않는다.
+- 왜 질문 부분이 아니라 답변 부분에만 loss를 계산할까요?
+- 길이를 맞추려고 넣은 padding을 정답으로 학습하면 어떻게 될까요?
+- 학습 step 수가 같으면 학습량도 같다고 볼 수 있을까요?
 
-원문 문단이 같거나 같은 문서에서 나온 질문이면 split을 document/group 기준으로 묶는 설계가 중요하다. 현재 작은 subset의 exact 중복 방지 외에 데이터 확장 시 semantic/source overlap을 추가 점검한다. 도메인 성능 증가와 일반 능력 감소가 동시에 나타나면 catastrophic forgetting을 설명한다.
+## 3단계: 특정 분야에 맞게 학습시키기
 
-## 4단계: DPO — 두 답 중 더 좋은 답 배우기
+[Domain 실습](../04_post_training/domain_huggingface/README.md)에서는 과학 분야를 예로 들어 두 가지 학습을 비교합니다.
 
-[DPO 실습](../04_post_training/dpo_huggingface/README.md)을 진행한다. “색 3개”라는 질문에 정확한 세 색 답은 chosen, 질문과 무관한 답은 rejected다. SFT가 하나의 모범 답을 따라 쓰는 수업이었다면 DPO는 두 답의 우선순위를 배우는 수업이다.
+- **CPT:** 과학 문서를 읽으며 다음 토큰을 예측하도록 학습합니다.
+- **QA SFT:** 과학 질문에 원하는 답을 하도록 학습합니다.
 
-데이터 한 줄은 prompt/chosen/rejected이고 같은 prompt가 split을 넘지 않아야 한다. 자체 작성 fixture 선호는 사람 설문 결과가 아니다. 작은 DPO loss 감소를 “인간 가치 정렬 완료”라고 쓰지 않는다.
+같은 모델에서 출발해 다음 세 경우를 비교해 보세요.
 
-뒤의 수식 수업에서는 policy와 고정 reference의 응답 log probability 차이를 배운다. Reference를 현재 SFT 출발점으로 정하고 beta와 reward margin의 의미를 설명한다. Pair metric과 실제 생성 평가는 다르며 둘 다 기록한다.
+1. CPT만 한 모델
+2. QA SFT만 한 모델
+3. CPT 다음에 QA SFT를 한 모델
 
-## 5–6단계: Reward model → RLHF PPO
+두 학습을 이어서 하면 항상 더 좋을까요? 미리 결론을 정하지 말고 결과를 확인해 봅시다.
 
-[RLHF 실습](../04_post_training/rlhf_ppo_huggingface/README.md)을 따른다. Reward model은 답변을 채점하는 별도 모델이다. 선호 쌍으로 채점기를 먼저 학습하고 held-out 쌍을 더 잘 정렬하는지 확인한다. 그다음 policy가 답변을 생성하고 채점기의 점수를 바탕으로 PPO update를 진행한다.
+과학 QA의 EM·F1, 문서의 perplexity, 일반 질문에 대한 답변을 함께 비교하세요. EM은 답이 정확히 일치하는지, F1은 답에 포함된 단어가 얼마나 겹치는지 보는 지표입니다. Perplexity는 문서의 다음 토큰을 얼마나 잘 예측하는지 살펴보는 지표입니다.
 
-Policy(답하는 모델), reference(원래 행동 기준), reward model(채점기), value model(예상 보상)의 역할을 먼저 말로 설명한다. 대학 수준에서는 Bradley–Terry pair loss, advantage, KL penalty, PPO ratio clipping, value loss를 연결한다.
+특정 분야의 성능이 좋아지는 대신 원래 잘하던 일을 못하게 될 수도 있습니다. 이런 현상을 **catastrophic forgetting**, 즉 기존 능력을 잊어버리는 문제라고 부릅니다.
 
-DPO 결과를 PPO 출발점으로 자동 연결하지 않는다. 같은 SFT 모델에서 시작해 DPO와 PPO를 비교한다. PPO가 reward를 올리면서도 답변이 길어지거나 반복이 늘면 reward hacking/length bias를 조사한다. Learned reward만으로 최종 품질을 판정하지 않고 독립 test와 사람이 읽은 예시를 함께 보존한다.
+데이터 분할도 중요합니다. 같은 문서에서 나온 질문이 학습과 평가에 나뉘어 들어가면 결과가 실제보다 좋아 보일 수 있습니다. 데이터가 커질수록 단순히 같은 문장을 찾는 데서 나아가, 출처가 같거나 내용이 비슷한 자료도 함께 살펴보세요.
 
-## 7단계: RLVR GRPO — 답을 직접 검산하기
+공개 SciQ 자료를 모델이 사전학습에서 이미 접했을 가능성도 있습니다. 따라서 이 실험을 “완전히 새로운 지식을 배웠다는 증명”으로 해석하지는 않습니다.
 
-[RLVR 실습](../04_post_training/rlvr_grpo_huggingface/README.md)에서 작은 정수 산술을 사용한다. 사람 선호를 예측하는 채점기 대신 verifier가 답이 맞는지 계산한다. RLVR는 **보상의 출처**, GRPO는 **policy 최적화 방법**이다. 같은 의미의 용어가 아니다.
+## 4단계: DPO — 두 답변 중 더 좋은 답 배우기
 
-한 질문에서 여러 답을 생성하고 같은 그룹의 reward를 비교해 advantage를 얻는다. 모든 답이 틀리거나 모두 맞으면 그룹 내 상대 신호가 사라질 수 있다. 먼저 쉬운 산술 SFT와 채점기 단위 사례를 준비하고 실패를 “step만 더 늘리면 해결”이라고 설명하지 않는다.
+SFT에서는 하나의 모범 답안을 보여 줬습니다. DPO에서는 같은 질문에 대한 두 답변을 보여 주고, 어느 답변을 더 선호하는지 알려 줍니다.
 
-정답 숫자를 여러 개 쓰면 하나쯤 맞을 수 있으므로 verifier는 단일 최종 정수 형식을 엄격하게 확인한다. 정답률뿐 아니라 invalid-format rate, reward 분산/zero-variance 그룹, 길이, KL, 독립 test 결과를 본다. 단순 산술 fixture에서 성공해도 일반 추론 능력 향상이라고 확장하지 않는다.
+[DPO 실습](../04_post_training/dpo_huggingface/README.md)에서 다음 형식의 데이터를 살펴보세요.
 
-## 8–9단계: VLM과 선택 실험
+- `prompt`: 질문
+- `chosen`: 더 선호하는 답변
+- `rejected`: 덜 선호하는 답변
 
-[V1 PyTorch](../03_vision/pytorch/README.md)에서 이미지와 텍스트 토큰이 만나는 위치를 보고, [V2 HF](../03_vision/huggingface/README.md)에서 언어 LoRA로 이미지 분류명을 학습한다. [V3 Unsloth](../03_vision/unsloth/README.md)는 별도 3B 모델 경로다. 다른 모델의 시간 차이를 도구 속도 차이로 단정하지 않는다.
+예를 들어 색 세 가지를 묻는 질문에서 정확한 세 색을 답한 문장은 chosen, 질문과 상관없는 문장은 rejected가 될 수 있습니다.
 
-이제 I2/I3/I5/I6/I7과 나머지 지식 기법 비교를 진행한다. 모델 revision, 데이터, token budget, seed와 학습 파라미터 범위를 고정한다. 반복 seed나 데이터 수 확대는 [추가 실험](08_next_experiments.md)을 따른다. 작은 실행부터 모델 크기를 늘린다.
+이 단계에서는 다음을 확인합니다.
 
-## 매 단계 공통 기록
+- 같은 질문이 학습과 평가에 중복으로 들어가지 않았나요?
+- 학습에 쓰지 않은 답변 쌍에서도 선호를 잘 구분하나요?
+- 모델이 직접 만든 답변도 나아졌나요?
 
-- [ ] 선수 수업의 완료 기준을 충족했다.
-- [ ] 데이터 예시 3개와 split/manifest를 읽었다.
-- [ ] 같은 조건의 baseline을 저장했다.
-- [ ] 새 출력 경로로 학습하고 명령·revision·seed·metadata를 남겼다.
-- [ ] 저장 결과를 별도 프로세스로 재로딩했다.
-- [ ] 전후 지표와 오류 예시를 비교하고 개선/악화 원인을 적었다.
-- [ ] 체크리스트와 TASK_LOGS에 실제 시각·case ID·보고서 경로를 갱신했다.
+답변 쌍을 잘 구분하는 것과 좋은 답변을 직접 만드는 것은 서로 다른 평가입니다. 둘 다 살펴보세요.
 
-현재 CUDA 수행은 미확인이다. 이 계획의 체크박스는 학습 결과를 자동 판정하지 않으며 실제 근거를 보고 갱신한다.
+수식에서는 학습 중인 모델인 **policy**와 비교 기준으로 고정해 둔 **reference**를 다룹니다. 두 모델이 답변에 부여하는 로그 확률을 비교하면서 beta와 reward margin의 의미를 알아봅니다.
+
+이 실습의 선호 데이터는 직접 작성한 예제입니다. 실제 사람을 대상으로 조사한 결과는 아니며, loss가 줄었다고 사람의 가치관을 모두 배웠다고 볼 수도 없습니다.
+
+## 5–6단계: 답변 채점기를 만들고 PPO로 학습하기
+
+이번에는 답변을 채점하는 별도 모델을 만듭니다. 이것이 **reward model**입니다.
+
+[RLHF 실습](../04_post_training/rlhf_ppo_huggingface/README.md)에서 두 과정을 차례로 진행합니다.
+
+1. 선호 답변 쌍으로 reward model을 학습합니다.
+2. 답변 모델이 생성한 문장을 reward model로 채점하고, 그 보상을 이용해 PPO로 학습합니다.
+
+먼저 네 모델의 역할을 구분해 보세요.
+
+| 모델 | 맡은 역할 |
+|---|---|
+| Policy | 실제 답변을 만듭니다. |
+| Reference | 원래 답변 방식에서 얼마나 달라졌는지 비교하는 기준입니다. |
+| Reward model | 생성한 답변에 점수를 줍니다. |
+| Value model | 앞으로 받을 보상을 예상합니다. |
+
+처음에는 역할부터 이해하면 됩니다. 이후 Bradley–Terry loss, advantage, KL penalty, PPO clipping, value loss를 코드와 연결해 봅니다.
+
+PPO는 DPO 결과에 자동으로 이어 붙이지 않습니다. 같은 SFT 모델에서 시작해 두 방법을 비교해 보세요.
+
+보상이 올라갔다고 답변도 좋아졌을까요? 답이 불필요하게 길어지거나 같은 말을 반복할 수 있습니다. 점수만 높이는 요령을 배우는 **reward hacking**이나 긴 답변을 더 좋아하는 **길이 편향**이 없는지 살펴봅시다.
+
+최종 판단에는 채점 모델의 점수뿐 아니라 별도 평가 데이터와 사람이 직접 읽은 답변도 사용하세요.
+
+## 7단계: RLVR GRPO — 답을 직접 검산하며 배우기
+
+산술 문제는 사람에게 선호를 물어보지 않아도 답을 계산해서 확인할 수 있습니다. [RLVR 실습](../04_post_training/rlvr_grpo_huggingface/README.md)에서는 이 특징을 이용합니다.
+
+여기서 두 용어를 구분해 두세요.
+
+- **RLVR:** 정답을 확인할 수 있는 방법으로 보상을 줍니다.
+- **GRPO:** 한 질문에 대해 만든 여러 답변의 보상을 비교하며 모델을 학습시키는 방법입니다.
+
+한 질문에서 여러 답을 만들고, 같은 그룹 안에서 어떤 답이 더 좋은 보상을 받았는지 비교합니다. 그런데 모두 틀리거나 모두 맞으면 상대적인 차이가 없어질 수 있습니다. 그래서 쉬운 산술 SFT와 채점기 확인부터 시작합니다.
+
+채점기는 최종 답이 정수 하나로 명확하게 제시됐는지도 확인합니다. 숫자를 여러 개 써 놓고 그중 하나가 맞았다고 보상을 주면 모델이 엉뚱한 요령을 배울 수 있기 때문입니다.
+
+정답률과 함께 다음도 살펴보세요.
+
+- 답변 형식을 지키지 않은 비율
+- 그룹 안의 보상 차이
+- 모든 답이 같은 보상을 받은 그룹의 비율
+- 답변 길이와 KL
+- 학습에 쓰지 않은 문제의 결과
+
+결과가 좋지 않다면 무조건 step을 늘리기보다, 문제 난이도와 출발 모델, 보상에 차이가 생기는지를 먼저 확인하세요.
+
+간단한 산술 문제에서 성공했다고 일반적인 추론 능력까지 좋아졌다고 단정하지는 않습니다.
+
+## 8–9단계: 이미지를 다루고 실험 넓혀 보기
+
+이제 이미지와 텍스트를 함께 다루는 VLM으로 넘어갑니다.
+
+- [V1 PyTorch](../03_vision/pytorch/README.md)에서 이미지와 텍스트가 모델에 어떻게 들어가는지 살펴봅니다.
+- [V2 HF](../03_vision/huggingface/README.md)에서 언어 부분의 LoRA로 이미지 분류명을 학습합니다.
+- 관심이 있다면 [V3 Unsloth](../03_vision/unsloth/README.md)로 확장합니다.
+
+평가 점수만 보지 말고 틀린 이미지도 직접 열어 보세요. 특정 종류의 잎을 자주 혼동하는지, 이미지보다 답변 형식을 잘못 익힌 것은 아닌지 살펴봅니다.
+
+V3는 다른 3B 모델을 사용합니다. 모델 크기와 구조가 다르므로 실행 시간 차이를 Unsloth와 다른 도구의 순수한 속도 차이라고 해석하면 안 됩니다.
+
+대표 과정을 익혔다면 전체 학습, LoRA, QLoRA와 다른 도구를 비교해 보세요. 비교할 때는 가능한 한 다음 조건을 맞춥니다.
+
+- 모델과 버전
+- 데이터와 분할
+- 학습에 사용하는 토큰 수
+- seed
+- 학습 설정과 평가 방법
+
+조건이 달라야 한다면 무엇이 달랐는지 함께 적어 두세요. 반복 실행, 데이터 확대, 더 큰 모델 실험은 [확장 과제](08_next_experiments.md)를 참고합니다.
+
+## Post-training에서는 어떤 도구를 쓰나요?
+
+DPO, reward modeling, PPO, GRPO는 **Hugging Face Transformers·PEFT·TRL**로 배웁니다. 도구를 여러 개로 바꾸기보다 같은 생태계 안에서 학습 원리의 차이에 집중하려는 구성입니다.
+
+| 실습 | 사용하는 도구 |
+|---|---|
+| Domain | Trainer와 PEFT LoRA, 기존 CPT·SFT 코드 |
+| DPO | DPOTrainer와 LoRA |
+| Reward modeling | RewardTrainer |
+| RLHF PPO | PPOTrainer |
+| RLVR GRPO | GRPOTrainer와 LoRA |
+
+공개 모델 개발에서도 이런 학습 방법을 찾아볼 수 있습니다. 더 궁금하다면 [Llama 3](https://arxiv.org/abs/2407.21783)의 SFT·DPO, [InstructGPT](https://arxiv.org/abs/2203.02155)의 reward model·PPO, [DeepSeekMath](https://arxiv.org/abs/2402.03300)의 GRPO를 읽어 보세요. 구현은 [TRL 공식 저장소](https://github.com/huggingface/trl)에서도 살펴볼 수 있습니다.
+
+Domain fine-tuning은 별도의 강화학습 알고리즘이 아닙니다. 특정 분야의 데이터와 목적에 맞춰 CPT와 SFT를 사용하는 과정입니다.
+
+## 다음 단계로 넘어가기 전에
+
+각 실습을 마칠 때 아래 질문에 답해 보세요.
+
+- [ ] 이 실습의 입력과 정답이 무엇인지 설명할 수 있나요?
+- [ ] 학습·설정 선택·최종 평가에 사용하는 데이터를 구분했나요?
+- [ ] 학습 전 결과를 남겼나요?
+- [ ] 실행 명령, 모델 버전, seed와 학습 설정을 남겼나요?
+- [ ] 기존 결과를 덮어쓰지 않고 새 경로에 저장했나요?
+- [ ] 저장한 모델이나 adapter를 새 프로세스에서 다시 불러왔나요?
+- [ ] 전후 지표와 실제 답변을 함께 비교했나요?
+- [ ] 잘된 점과 실패한 점, 다음에 바꿔 볼 조건을 설명할 수 있나요?
+
+점수가 반드시 좋아져야 다음 단계로 넘어갈 수 있는 것은 아닙니다. 결과를 제대로 확인하고, 좋아지거나 나빠진 이유를 생각해 보는 것까지가 실습입니다.
