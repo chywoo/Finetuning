@@ -309,3 +309,11 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - 최종 문서 확인: Markdown 32개 로컬 링크/코드 fence 정상, case ID 34개·중복 없음, coverage 81.56%와 skipped 학습 검사 표기 일치, `git diff --check` 통과. 학습·큰 모델 다운로드·원격 작업은 실행하지 않았다.
 - Unsloth 의존성 충돌과 공급 wheel tag 검사 경고는 해소한 것으로 표시하지 않았다. 실제 학습·성능 비교·native 전체 matrix는 사용자 조건상 이번 구축 작업의 완료 범위에 포함하지 않는다.
 - 교육·진행 문서 milestone을 `docs: complete staged lab guide and verification status`로 local commit한다. 캐시·데이터·가상환경·모델/검사 출력은 commit에 넣지 않는다.
+
+### 2026-10-02 13:08:18 EDT — README 학습 안내 개편
+
+- 사용자가 승인한 친근한 한국어 초안을 README에 반영했다. 프로젝트 목표·학습 후 할 수 있는 일·통합 커리큘럼·공부 방법·환경 준비·모델과 데이터·파일 안내 순서로 구성했다.
+- README의 작업 이력 문구, 시간별 작업 기록 안내, Graft 관련 내용과 탐색 링크를 제거했다. 다른 문서와 기존 기록은 유지했다.
+- Linux CUDA·DGX Spark·Apple Silicon·Intel macOS 안내를 환경 준비 섹션에 모았다. Intel Mac의 공식 PyTorch 2.2.x/2.2.2 바이너리 제한과 미검증 실행 범위를 명시하고 공식 출처 링크를 유지했다.
+- 문서 로컬 링크·코드 fence·제거 문구와 `git diff --check`를 확인했다. Ruby 검사 도구가 없어 Python 표준 라이브러리로 문서 검사만 수행했다. ML import·pytest·설치·다운로드·학습은 실행하지 않았다.
+- 문서만 변경하여 실습 완료 집계 0/34는 바꾸지 않았다. `docs: rewrite README as a friendly learning guide`로 local commit한다.
