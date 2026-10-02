@@ -243,3 +243,11 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - Commit 전 읽기 전용 확인: 소스/문서에서 일반적인 API token/private key 패턴 검출 없음. 이전 정적 리뷰 결과와 CUDA/coverage 미확인 상태를 기록한다. Intel Mac의 환경 감사·ML import·pytest·학습은 실행하지 않는다.
 - 초기 스냅샷 commit 제목: `feat: add staged fine-tuning and post-training learning lab`. 이 commit은 중단 전에 작성된 결과와 현재 문서를 기록하며 구현 재개가 아니다.
 - 이후에는 각 주요 계획/문서 작업 종료 시 변경 검토→local commit→시각별 이력 기록을 진행한다. Push·원격 작업은 실행하지 않는다.
+
+### 2026-10-02 10:17:12 EDT — 초기 스냅샷 Git commit 완료
+
+- Commit: `08d4c97` — `feat: add staged fine-tuning and post-training learning lab`.
+- 85개 파일을 local main branch의 최초 commit으로 기록했다. 주요 계획·문서·중단 전에 작성된 소스를 보존했고, 모델 출력·가상환경·캐시·기존 ignore 대상 데이터/Graft는 포함하지 않았다.
+- Commit 직후 `git status --short`는 비어 있었다. 원격 push는 실행하지 않았다.
+- 구현 중단 상태를 유지한다. 이번 요청 후에는 실행 코드·테스트 구현을 변경하지 않았으며, 현재 작업은 운영 규칙·문서·Git 기록 정리다.
+- 이 완료 이력을 별도 문서 commit(`docs: record initial milestone commit`)으로 기록한다. 해당 commit 자체의 hash는 `git log`에서 확인한다.
