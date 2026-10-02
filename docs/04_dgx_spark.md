@@ -16,7 +16,7 @@ cd ~/finetune
 bash scripts/spark_container.sh hf
 ```
 
-launcher는 폴더를 `/workspace/finetune`에 연결하고 GPU를 노출합니다. datasets/model cache와 outputs도 같은 호스트 폴더에 남습니다. 컨테이너 종료 후에도 데이터와 결과는 보존됩니다. Mac의 `.venv`를 Spark에 복사하지 않습니다.
+launcher는 폴더를 `~/finetune`에 연결하고 GPU를 노출합니다. datasets/model cache와 outputs도 같은 호스트 폴더에 남습니다. 컨테이너 종료 후에도 데이터와 결과는 보존됩니다. Mac의 `.venv`를 Spark에 복사하지 않습니다.
 
 ## 2. PyTorch / HF / VLM profile
 
