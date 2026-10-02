@@ -9,6 +9,7 @@ from pathlib import Path
 
 from finetune_lab.data import read_jsonl, validate_splits
 from finetune_lab.text_encoding import CausalLMCollator, encode_record
+from finetune_lab.paths import project_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -148,16 +149,20 @@ def validation_loss(model, loader, device: str, compute_dtype: str = "float32") 
     was_training = model.training
     model.eval()
     numerator, denominator = 0.0, 0
-    with torch.no_grad():
-        for batch in loader:
-            target_count = int((batch["labels"][:, 1:] != -100).sum().item())
-            with compute_autocast(torch, device, compute_dtype):
-                loss = model(**_move_batch(batch, device)).loss
-            if not torch.isfinite(loss):
-                raise RuntimeError("Validation produced a non-finite loss")
-            numerator += float(loss.item()) * target_count
-            denominator += target_count
-    model.train(was_training)
+    try:
+        with torch.no_grad():
+            for batch in loader:
+                target_count = int((batch["labels"][:, 1:] != -100).sum().item())
+                if not target_count:
+                    raise ValueError("Validation contains no causal target tokens")
+                with compute_autocast(torch, device, compute_dtype):
+                    loss = model(**_move_batch(batch, device)).loss
+                if not torch.isfinite(loss):
+                    raise RuntimeError("Validation produced a non-finite loss")
+                numerator += float(loss.item()) * target_count
+                denominator += target_count
+    finally:
+        model.train(was_training)
     if denominator == 0:
         raise ValueError("Validation contains no causal target tokens")
     return numerator / denominator
@@ -189,6 +194,7 @@ def train_loop(model, train_loader, args, device: str, compute_dtype: str = "flo
     updates, epochs, numerator, denominator = 0, 0, 0.0, 0
     while updates < args.max_steps:
         epochs += 1
+        epoch_updates = updates
         for window in _accumulation_windows(train_loader, args.gradient_accumulation):
             token_counts = [int((batch["labels"][:, 1:] != -100).sum().item()) for batch in window]
             window_tokens = sum(token_counts)
@@ -209,6 +215,8 @@ def train_loop(model, train_loader, args, device: str, compute_dtype: str = "flo
             print(json.dumps({"step": updates, "train_loss": numerator / denominator}, ensure_ascii=False), flush=True)
             if updates >= args.max_steps:
                 break
+        if updates == epoch_updates:
+            raise ValueError("Training loader is empty")
     return {"optimizer_steps": updates, "epochs_started": epochs, "train_loss": numerator / denominator,
             "train_target_tokens_seen": denominator}
 
@@ -222,10 +230,9 @@ def main(task: str, argv: list[str] | None = None) -> None:
         task_directory = "instruction" if task == "instruction" else f"knowledge_{kind}"
         output_name = "pytorch" if task == "instruction" else f"pytorch-{kind}"
         args.output_dir = args.output_dir or ROOT / "outputs" / task / output_name
-        if not args.dry_run and any((args.output_dir / name).exists() for name in (
-            "training_metadata.json", "config.json", "adapter_config.json"
-        )):
-            raise ValueError(f"{args.output_dir} already contains a run; choose a new --output-dir")
+        if not args.dry_run:
+            from finetune_lab.hf_text import _validate_output_dir
+            _validate_output_dir(args.output_dir)
         data_dir = args.data_dir or ROOT / "data" / "processed" / task_directory
         train_rows, validation_rows, test_examples = load_training_data(data_dir, kind)
     except (ValueError, FileNotFoundError) as error:
@@ -234,10 +241,10 @@ def main(task: str, argv: list[str] | None = None) -> None:
     summary = {"task": task, "kind": kind, "method": args.method, "model": args.model,
                "base_model": base_model, "revision": args.revision, "requested_revision": args.revision,
                "requested_dtype": args.dtype, "prompt_format": "### Instruction:\n{prompt}\n\n### Response:\n",
-               "data_dir": str(data_dir.resolve()),
+               "data_dir": project_path(data_dir),
                "train_examples": len(train_rows), "validation_examples": len(validation_rows),
                "test_examples": test_examples,
-               "output_dir": str(args.output_dir.resolve()), "smoke_model": args.smoke_model}
+               "output_dir": project_path(args.output_dir), "smoke_model": args.smoke_model}
     if args.dry_run:
         print(json.dumps({**summary, "dry_run": True}, indent=2, ensure_ascii=False))
         return

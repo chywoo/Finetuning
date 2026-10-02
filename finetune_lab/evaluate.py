@@ -8,6 +8,7 @@ from collections import Counter
 from pathlib import Path
 
 from finetune_lab.data import read_jsonl
+from finetune_lab.paths import project_path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -72,8 +73,22 @@ def load_text_model(model_name: str, revision: str, device):
     return model, tokenizer, metadata
 
 
+def generation_prompt_ids(prompt_ids: list[int], max_length: int, max_new_tokens: int,
+                          config) -> list[int]:
+    """Reserve actual model context for generation, keeping the response delimiter."""
+    context_limit = getattr(config, "max_position_embeddings", None) or getattr(config, "n_positions", None)
+    if max_new_tokens < 1 or (context_limit and max_new_tokens >= context_limit):
+        raise ValueError("Generation token budget must leave at least one context token")
+    width = min(max_length, context_limit - max_new_tokens) if context_limit else max_length
+    if not prompt_ids or width < 1:
+        raise ValueError("Generation needs non-empty prompt context")
+    return prompt_ids[-width:]
+
+
 def evaluate_records(model, tokenizer, rows: list[dict], kind: str, max_length: int,
                      max_new_tokens: int, device) -> dict:
+    if not rows:
+        raise ValueError("Evaluation requires non-empty rows")
     import torch
     from finetune_lab.text_encoding import encode_record, format_prompt
     weighted_loss, target_count, generations = 0.0, 0, []
@@ -93,11 +108,7 @@ def evaluate_records(model, tokenizer, rows: list[dict], kind: str, max_length: 
             if kind == "sft":
                 prompt_ids = tokenizer.encode(format_prompt(row["prompt"]), add_special_tokens=False)
                 # Preserve the response delimiter at the end, as in training.
-                prompt_ids = prompt_ids[-max_length:]
-                context_limit = getattr(model.config, "max_position_embeddings", None) or getattr(
-                    model.config, "n_positions", None)
-                if context_limit and len(prompt_ids) + max_new_tokens > context_limit:
-                    prompt_ids = prompt_ids[-max(1, context_limit - max_new_tokens):]
+                prompt_ids = generation_prompt_ids(prompt_ids, max_length, max_new_tokens, model.config)
                 inputs = torch.tensor([prompt_ids], dtype=torch.long, device=device)
                 outputs = model.generate(input_ids=inputs, attention_mask=torch.ones_like(inputs),
                                          max_new_tokens=max_new_tokens, do_sample=False,
@@ -131,14 +142,16 @@ def main() -> None:
     args = parser.parse_args()
     if args.max_eval_samples < 1 or args.max_length < 3 or args.max_new_tokens < 1:
         parser.error("sample/token limits must be positive (max_length >= 3)")
+    if args.output.exists():
+        parser.error("--output already exists; choose a new report path")
     rows = read_jsonl(args.data_dir / f"{args.split}.jsonl", args.kind)[:args.max_eval_samples]
     device = resolve_device(args.device)
     model, tokenizer, metadata = load_text_model(args.model, args.revision, device)
     if metadata.get("kind") and metadata["kind"] != args.kind:
         print(f"Note: model trained for {metadata['kind']}; evaluating {args.kind}")
-    result = {"model": args.model, "requested_revision": args.revision,
+    result = {"model": project_path(args.model), "requested_revision": args.revision,
               "resolved_model_revision": getattr(model.config, "_commit_hash", None),
-              "training_metadata": metadata, "data_dir": str(args.data_dir),
+              "training_metadata": metadata, "data_dir": project_path(args.data_dir),
               "split": args.split, "kind": args.kind, "max_length": args.max_length,
               "max_new_tokens": args.max_new_tokens,
               **evaluate_records(model, tokenizer, rows, args.kind, args.max_length,
@@ -148,7 +161,7 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False) + "\n")
     print(json.dumps({k: v for k, v in result.items() if k not in ("generations", "training_metadata")}, indent=2))
-    print(f"Full report: {args.output}")
+    print(f"Full report: {project_path(args.output)}")
 
 
 if __name__ == "__main__":

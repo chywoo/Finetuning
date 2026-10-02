@@ -1,1 +1,2 @@
 -r lab-hf.txt
+trl==0.24.0

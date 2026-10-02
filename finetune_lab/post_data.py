@@ -5,7 +5,6 @@ import importlib.metadata
 import json
 import math
 from pathlib import Path
-import platform
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -120,11 +119,9 @@ def require_full_checkpoint(model: str) -> str:
 
 
 def require_cuda():
-    if platform.system() != "Linux" or platform.machine().lower() not in ("aarch64", "arm64"):
-        raise RuntimeError("Run inside the DGX Spark ARM64 Linux container; dry-run uses no ML dependencies")
     import torch
-    if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
-        raise RuntimeError("This DGX Spark lesson requires exactly one CUDA GPU; no CPU/MPS fallback")
+    if not torch.cuda.is_available():
+        raise RuntimeError("This post-training lesson requires a CUDA GPU; dry-run needs no ML dependencies")
     if not torch.cuda.is_bf16_supported():
         raise RuntimeError("This lesson requires CUDA BF16 support")
     return torch
@@ -133,7 +130,7 @@ def require_cuda():
 def check_trl_version() -> dict:
     versions = {name: importlib.metadata.version(name) for name in ("trl", "transformers", "peft", "torch")}
     if versions["trl"] != "0.24.0":
-        raise RuntimeError("Use TRL 0.24.0 from the Spark post-training requirements")
+        raise RuntimeError("Use TRL 0.24.0 from the post-training requirements")
     return versions
 
 
@@ -156,9 +153,20 @@ def validate_finite_values(value) -> None:
             validate_finite_values(nested)
 
 
+def project_path(path: Path | str) -> str:
+    """Record project-relative paths, Hub IDs, or a redacted external location."""
+    candidate = Path(path)
+    if isinstance(path, str) and not candidate.is_absolute() and not path.startswith(("./", "../")) and not candidate.exists():
+        return path
+    try:
+        return candidate.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return "<external path>"
+
+
 def dataset_manifest(data_dir: Path | str) -> dict:
     directory = Path(data_dir)
-    return {"data_dir": str(directory.resolve()), "sha256": {
+    return {"data_dir": project_path(directory), "sha256": {
         split: hashlib.sha256((directory / f"{split}.jsonl").read_bytes()).hexdigest() for split in SPLITS}}
 
 

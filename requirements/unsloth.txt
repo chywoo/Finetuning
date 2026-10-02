@@ -1,2 +1,2 @@
-# Compatibility alias; use scripts/install_spark.sh unsloth inside the Spark container.
--r spark-unsloth.txt
+# Compatibility alias; use a separate compatible CUDA environment.
+-r lab-unsloth.txt

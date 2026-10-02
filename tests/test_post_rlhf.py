@@ -1,4 +1,4 @@
-"""RLHF tests are authored here; run them on DGX Spark, not on this Mac."""
+"""RLHF contract tests plus an explicitly enabled CUDA training integration."""
 import contextlib
 import io
 import json
@@ -99,11 +99,12 @@ class RLHFContractsTests(unittest.TestCase):
                         require_reward_checkpoint(directory)
 
 
-@unittest.skipUnless(os.environ.get("RUN_SPARK_POST_TESTS") == "1", "Run this integration test only on DGX Spark")
+@unittest.skipUnless(os.environ.get("RUN_POST_TRAINING_TESTS") == "1" or os.environ.get("RUN_SPARK_POST_TESTS") == "1",
+                     "Explicitly enable the CUDA training integration test")
 class RewardPPOIntegrationTests(unittest.TestCase):
     def test_trained_reward_then_ppo_save_and_independent_reload_evaluation(self):
         root = Path(__file__).resolve().parents[1]
-        model = os.environ.get("SPARK_POST_SFT_MODEL", "HuggingFaceTB/SmolLM2-135M-Instruct")
+        model = os.environ.get("POST_SFT_MODEL", os.environ.get("SPARK_POST_SFT_MODEL", str(root / "outputs/preference_sft_full")))
         data = root / "data/demo/post_preferences"
         common = ["--model", model, "--data-dir", str(data), "--max-length", "128",
                   "--max-prompt-length", "96", "--response-length", "8", "--seed", "42"]

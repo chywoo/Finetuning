@@ -1,4 +1,4 @@
-"""DPO with a fresh LoRA adapter on a full SFT checkpoint; DGX Spark CUDA only."""
+"""DPO with a fresh LoRA adapter on a full SFT checkpoint; CUDA runtime."""
 import argparse
 from contextlib import nullcontext
 import json
@@ -7,7 +7,7 @@ from pathlib import Path
 
 from finetune_lab.post_data import (
     ROOT, check_trl_version, dataset_manifest, read_preferences, require_cuda,
-    require_fresh_output, require_full_checkpoint, validate_finite_values, write_report,
+    require_fresh_output, require_full_checkpoint, validate_finite_values, write_report, project_path,
 )
 from finetune_lab.text_encoding import encode_record, format_prompt
 
@@ -60,10 +60,10 @@ def validate_preference_lengths(row, tokenizer, args, context_limit=None):
     return {"prompt": prompt, "chosen": row["chosen"], "rejected": row["rejected"]}
 
 
-def preference_dataset(rows, tokenizer, args):
+def preference_dataset(rows, tokenizer, args, context_limit=None):
     """Reject truncation so that a preference label still compares complete answers."""
     from datasets import Dataset
-    records = [validate_preference_lengths(row, tokenizer, args) for row in rows]
+    records = [validate_preference_lengths(row, tokenizer, args, context_limit) for row in rows]
     return Dataset.from_list(records)
 
 
@@ -86,7 +86,9 @@ def train(args, splits):
                                                 trust_remote_code=False, use_safetensors=True)
     model.config.use_cache = False
     revision = getattr(model.config, "_commit_hash", None) or args.revision
-    datasets = {split: preference_dataset(splits[split], tokenizer, args) for split in ("train", "validation")}
+    context_limit = getattr(model.config, "max_position_embeddings", None) or getattr(model.config, "n_positions", None)
+    datasets = {split: preference_dataset(splits[split], tokenizer, args, context_limit)
+                for split in ("train", "validation")}
     config = DPOConfig(
         output_dir=str(args.output_dir), max_steps=args.max_steps, learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size, per_device_eval_batch_size=args.batch_size,
@@ -134,7 +136,7 @@ def train(args, splits):
                 "runtime_verified": "This file is written only after successful CUDA training"}
     write_report(args.output_dir / "training_metadata.json", metadata)
     write_report(args.output_dir / "metrics.json", metrics)
-    print(json.dumps({"output_dir": str(args.output_dir), "metrics": after}, indent=2))
+    print(json.dumps({"output_dir": project_path(args.output_dir), "metrics": after}, indent=2))
 
 
 def completion_log_probability(model, tokenizer, prompt, completion, max_length):
@@ -179,7 +181,7 @@ def evaluate(args, splits):
                          "policy_gap": chosen - rejected, "reference_gap": reference_gap,
                          "reference_adjusted_gap": chosen - rejected - reference_gap if reference_gap is not None else None,
                          "generated": prediction})
-    result = {"model": args.model, "split": args.split, "count": len(examples),
+    result = {"model": project_path(args.model), "split": args.split, "count": len(examples),
               "preference_accuracy": sum(row["policy_gap"] > 0 for row in examples) / len(examples),
               "mean_policy_gap": sum(row["policy_gap"] for row in examples) / len(examples),
               "human_alignment_claim": False, "training_metadata": metadata, "examples": examples}

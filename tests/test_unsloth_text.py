@@ -141,9 +141,9 @@ class UnslothTextTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "overlap"):
                 load_split_records(Path("unneeded"), "sft")
 
-    def test_unsupported_os_stops_before_runtime_imports(self):
-        with patch("finetune_lab.unsloth_text.platform.system", return_value="Darwin"):
-            with self.assertRaisesRegex(RuntimeError, "Linux"):
+    def test_unavailable_cuda_stops_before_unsloth_imports(self):
+        with patch.dict("sys.modules", {"torch": MagicMock(cuda=MagicMock(is_available=lambda: False))}):
+            with self.assertRaisesRegex(RuntimeError, "CUDA"):
                 load_runtime()
 
     def test_config_preserves_pretokenized_labels_and_has_no_network_reporting(self):
@@ -225,7 +225,7 @@ class UnslothTextTests(unittest.TestCase):
             self.assertEqual(metadata["method"], "unsloth")
             self.assertEqual(metadata["base_model"], "HuggingFaceTB/SmolLM2-135M")
             self.assertEqual(metadata["revision"], "resolved-base-sha")
-            with self.assertRaisesRegex(ValueError, "new --output-dir"):
+            with self.assertRaisesRegex(ValueError, "output-dir"):
                 train(args, records, records)
 
     def test_main_runs_runtime_after_data_validation(self):

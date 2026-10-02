@@ -283,3 +283,18 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - 복사된 데이터는 변경하지 않았다. 학습·다운로드·설치·pytest는 실행하지 않았다. 누락 라이브러리와 전체 환경 준비, 학습·저장·재로딩·coverage는 기존 미확인 상태를 유지한다.
 - 체크리스트의 현재 데이터·manifest 준비와 I1 실제 데이터 진입 검사를 완료로 갱신하고 검증 문서에 재검사 근거를 추가했다. 실습 완료 집계는 0/34, 추가 과제는 0/11로 유지한다.
 - 이번 문서 변경만 `docs: verify copied practice datasets`로 local commit한다. 사용자 변경과 기존 데이터는 보존한다.
+
+### 2026-10-02 11:36:22 EDT — 전체 구현 보완 / 비학습 회귀 검증 완료
+
+- 최초 요청의 수업·실습 코드·데이터·검증 전체를 점검했다. 실제 모델 학습과 오래 걸리는 실행 제외 조건을 유지하고, 저장소 지침에 따라 독립 문서·base/VLM·post-training 리뷰를 병렬 진행했다.
+- 적용 skill: 기존 `mle-workflow`, `codebase-onboarding`과 `python-patterns`, `python-testing`, `pytorch-patterns`. 데이터 계약·재현성, 테스트 먼저 작성, 실제 근거와 mock 범위 구분에 적용했다.
+- 기존 `.venv`와 사용자 작성 `AGENTS.md`·`pyproject.toml`을 보존하고 별도 `.venv-lab`에 고정 HF/post 의존성을 설치했다. Transformers 4.57.6, Datasets 4.3.0, PEFT 0.18.1, Accelerate 1.12.0, TRL 0.24.0으로 검사했다. 기존 torch/Triton 버전을 보호했고 모델 가중치를 다운로드하지 않았다.
+- `scripts/doctor.py`에 일반 profile import/CUDA 검사와 새 보고서 저장을 추가했다. 특정 호스트 아키텍처·장비명 강제를 일반 실습에서 제거하고 실제 CUDA/BF16 요구를 유지했다. Spark 전용 검사는 선택 옵션으로 유지한다. HF/post import, 작은 CUDA tensor 및 고정 TRL Trainer 생성자 signature 검사가 성공했다.
+- `scripts/check_data.py`와 공통 validation 모듈로 manifest·JSONL 건수/해시·schema·split·선호/산술→SFT 대응·CPT/QA source-row split·이미지 decoding/RGB pixel hash를 반복 검사하도록 구현했다. 복사한 manifest 10개, JSONL 36개, 이미지 168개 전체 통과. 근거: `outputs/readiness/data-audit.json`.
+- 회귀 테스트로 확인·수정: 부분 저장 결과와 평가 보고서 덮어쓰기, 잘못된 adapter metadata, 평가 context/빈 입력, empty loader 무한 루프, validation 실패 시 model mode 복원, DPO 학습 context 초과, Reward/PPO dry-run 선수 checkpoint 강제 검사를 보완했다. VLM PyTorch는 공통 causal target-token 가중 accumulation을 재사용하고 non-finite metrics 저장을 거부한다.
+- 임의 초기화 tiny GPT-2의 실제 forward·생성·저장·재로딩과 학습하지 않은 LoRA adapter의 저장·재로딩·merge를 검사했다. Trainer/DPO/RM/PPO/GRPO 학습 단계는 fake 경계로 train/validation/reference/reward/value/save 연결만 검사했다. 기존 작은 scalar gradient 단위계산은 포함했지만 실제 LLM 학습 optimizer와 품질 실험은 실행하지 않았다.
+- 최종 명령: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 RUN_ML_TESTS=0 RUN_SPARK_POST_TESTS=0 RUN_POST_TRAINING_TESTS=0 OMP_NUM_THREADS=1 timeout 90 .venv-lab/bin/python -m pytest -q --cov=finetune_lab --cov-report=term-missing --cov-report=json:outputs/readiness/coverage.json --cov-report=xml:outputs/readiness/coverage.xml --junitxml=outputs/readiness/tests.xml --cov-fail-under=80`.
+- 실제 결과: 172 passed, 2 학습 integration skipped, 37 subtests passed, 2 PEFT Conv1D 설정 경고. 전체 branch 포함 coverage 81.56%, 종료 코드 0, 약 5.63초. Coverage 제외 설정이나 성공 위장은 추가하지 않았다. 근거: 위 XML/JSON 보고서.
+- 잔여 환경 조건: Unsloth 2026.9.14는 torch `<2.13`을 요구하여 기존 torch 2.14.1과 의존성 해결이 불가능했다. 별도 호환 환경이 필요하며 native import/kernel 성공으로 기록하지 않는다. `uv pip check`는 기존 `nvidia-cusparselt-cu13==0.8.1` 공급 wheel tag를 지원하지 않는다고 보고했다. 별도 환경에 같은 버전을 재설치해도 경고가 남았다. 해당 공유 라이브러리 로딩과 dense CUDA 연산은 성공했지만 sparse kernel 검증을 대신하지 않는다. 원래 런타임을 임의 교체하지 않았다.
+- 정적 확인: Python 51개 AST 및 800줄 제한, 수업 문서 로컬 링크, shell 문법, `git diff --check` 통과. 기본 `graft build --no-gitignore --no-ignore`로 51개 카드를 재생성했다. 원격 LLM pass·키 사용은 없었다.
+- 실습 학습 완료는 여전히 0/34이다. 구현·빠른 검증 milestone을 `fix: harden portable lab validation and checkpoint safety`로 local commit하고, 교육 문서·집계는 별도 문서 milestone에 반영한다.

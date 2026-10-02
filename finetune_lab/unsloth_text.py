@@ -7,8 +7,8 @@ import json
 import math
 from numbers import Real
 from pathlib import Path
-import platform
 from typing import Any
+from finetune_lab.paths import project_path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
@@ -87,11 +87,15 @@ def model_origin(model_name: str, revision: str) -> tuple[str, str, bool]:
     if not adapter_config.is_file():
         return model_name, revision, False
     config = json.loads(adapter_config.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise ValueError("adapter_config.json must be a JSON object")
     base = config.get("base_model_name_or_path")
     if not isinstance(base, str) or not base:
         raise ValueError("adapter_config.json needs base_model_name_or_path")
     metadata_path = directory / "training_metadata.json"
     metadata = json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.is_file() else {}
+    if not isinstance(metadata, dict):
+        raise ValueError("training_metadata.json must be a JSON object")
     base_revision = metadata.get("revision") or config.get("revision") or revision
     if not isinstance(base_revision, str) or not base_revision:
         raise ValueError("adapter revision must be a nonempty string")
@@ -105,26 +109,22 @@ def run_metadata(args: argparse.Namespace) -> dict:
         "prompt_format": "instruction_response_v1", "method": "unsloth",
         "stage": args.stage, "max_length": args.max_length,
         "load_in_4bit": args.load_in_4bit, "seed": args.seed,
-        "model_input": args.model, "lora_r": args.lora_r, "lora_alpha": args.lora_alpha,
-        "target_runtime": "DGX Spark Linux aarch64 Blackwell sm_121 CUDA",
+        "model_input": project_path(args.model), "lora_r": args.lora_r, "lora_alpha": args.lora_alpha,
+        "target_runtime": "supported NVIDIA CUDA runtime",
     }
 
 
 def load_runtime() -> tuple:
     """Unsloth must patch libraries before importing Transformers or TRL."""
-    if platform.system() != "Linux" or platform.machine().lower() not in {"aarch64", "arm64"}:
-        raise RuntimeError("This lab targets DGX Spark aarch64 Linux. Launch scripts/spark_container.sh unsloth.")
     try:
         import torch
         if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is unavailable. Use the DGX Spark NGC container and its bundled PyTorch.")
-        if torch.cuda.get_device_capability(0) != (12, 1):
-            raise RuntimeError("Expected DGX Spark Blackwell compute capability 12.1 (sm_121).")
+            raise RuntimeError("CUDA is unavailable. Unsloth requires a supported NVIDIA CUDA environment.")
         from unsloth import FastLanguageModel, is_bfloat16_supported
         from datasets import Dataset
         from trl import SFTConfig, SFTTrainer
     except ImportError as error:
-        raise RuntimeError("Run scripts/install_spark.sh unsloth inside the Spark container first.") from error
+        raise RuntimeError("Install the Unsloth profile in a separate supported CUDA environment first.") from error
     return torch, FastLanguageModel, is_bfloat16_supported, Dataset, SFTConfig, SFTTrainer
 
 
@@ -209,8 +209,8 @@ def save_artifacts(args: argparse.Namespace, model: Any, tokenizer: Any, trainer
 
 
 def train(args: argparse.Namespace, train_records: list[dict], validation_records: list[dict]) -> dict:
-    if (args.output_dir / "training_metadata.json").exists():
-        raise ValueError("Output already contains a run. Choose a new --output-dir.")
+    from finetune_lab.hf_text import _validate_output_dir
+    _validate_output_dir(args.output_dir)
     torch, fast_model, supports_bf16, dataset_class, config_class, trainer_class = load_runtime()
     from finetune_lab.text_encoding import CausalLMCollator
 
@@ -239,9 +239,9 @@ def main(argv: list[str] | None = None, task: str = "instruction") -> int:
     train_records, validation_records = load_split_records(args.data_dir, args.stage)
     plan = {
         **run_metadata(args), "task": task, "dry_run": args.dry_run,
-        "data_dir": str(args.data_dir), "output_dir": str(args.output_dir),
+        "data_dir": project_path(args.data_dir), "output_dir": project_path(args.output_dir),
         "train_records": len(train_records), "validation_records": len(validation_records),
-        "required_runtime": "DGX Spark Linux aarch64 Blackwell sm_121 CUDA",
+        "required_runtime": "supported NVIDIA CUDA runtime",
     }
     if args.dry_run:
         print(json.dumps(plan, ensure_ascii=False, indent=2))

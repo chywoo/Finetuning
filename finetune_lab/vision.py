@@ -15,6 +15,7 @@ import platform
 import random
 import re
 from pathlib import Path
+from finetune_lab.paths import project_path
 
 BEAN_LABELS = ("angular_leaf_spot", "bean_rust", "healthy")
 SMOL_MODEL = "HuggingFaceTB/SmolVLM-256M-Instruct"
@@ -273,46 +274,25 @@ def _attach_language_lora(model):
 def _run_torch(args, model, processor, train):
     import torch
     from torch.utils.data import DataLoader
+    from finetune_lab.torch_text import train_loop
 
     selected = _select_language_blocks(model, args.decoder_layers)
     print(json.dumps({"training_decoder_layers": selected, "vision_encoder_frozen": True}))
     model.config.use_cache = False
-    model.train()
-    parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
-    optimizer = torch.optim.AdamW(parameters, lr=args.learning_rate)
     generator = torch.Generator().manual_seed(args.seed)
     loader = DataLoader(train, batch_size=args.batch_size, shuffle=True, generator=generator,
                         collate_fn=VisionCollator(processor, args.data_dir, model.config.image_token_id))
-    iterator = iter(loader)
-    optimizer.zero_grad(set_to_none=True)
-    history = []
-    for step in range(args.max_steps):
-        losses = []
-        for _ in range(args.gradient_accumulation):
-            try:
-                batch = next(iterator)
-            except StopIteration:
-                iterator = iter(loader)
-                batch = next(iterator)
-            batch = {key: value.to(args.device) for key, value in batch.items()}
-            loss = model(**batch).loss
-            if not math.isfinite(loss.item()):
-                raise RuntimeError("non-finite loss: inspect assistant masks and precision")
-            (loss / args.gradient_accumulation).backward()
-            losses = [*losses, loss.item()]
-        torch.nn.utils.clip_grad_norm_(parameters, 1.0)
-        optimizer.step()
-        optimizer.zero_grad(set_to_none=True)
-        metrics = {"step": step + 1, "loss": sum(losses) / len(losses)}
-        history = [*history, metrics]
-        print(json.dumps(metrics))
-    _save_metrics(args.output_dir, {"history": history})
+    # Shared causal target-token weighting also handles the short final window.
+    config = argparse.Namespace(**{**vars(args), "weight_decay": 0.01, "max_grad_norm": 1.0})
+    metrics = train_loop(model, loader, config, args.device)
+    _save_metrics(args.output_dir, metrics)
     return model
 
 
 def _save_metrics(output_dir, metrics):
+    text = json.dumps(metrics, indent=2, allow_nan=False) + "\n"
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "training_metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+    (output_dir / "training_metrics.json").write_text(text)
 
 
 def _run_hf(args, model, processor, train, validation):
@@ -412,6 +392,9 @@ def _run_unsloth(args, model, processor, train, validation):
 def evaluate(args, model, processor, rows):
     import torch
 
+    report_path = args.output_dir / "evaluation.json"
+    if report_path.exists():
+        raise ValueError("Evaluation report exists; choose a new output directory")
     model.eval()
     device = next(model.parameters()).device
     predictions = []
@@ -431,8 +414,8 @@ def evaluate(args, model, processor, rows):
     metrics = classification_metrics([item["reference"] for item in predictions],
                                      [item["prediction"] for item in predictions])
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    (args.output_dir / "evaluation.json").write_text(
-        json.dumps({"model": args.model, "revision": args.revision, "split": args.split,
+    report_path.write_text(
+        json.dumps({"model": project_path(args.model), "revision": args.revision, "split": args.split,
                     **metrics, "predictions": predictions}, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps(metrics, indent=2, ensure_ascii=False))
 
@@ -469,13 +452,11 @@ def _runtime_metadata(model):
 
     cuda = torch.cuda.is_available()
     return {
-        "python": platform.python_version(), "architecture": platform.machine(),
+        "python": platform.python_version(),
         "packages": {name: version(name) for name in ("torch", "transformers", "peft", "trl", "unsloth")},
         "cuda_version": torch.version.cuda,
         "device": str(next(model.parameters()).device),
         "loaded_parameter_dtype": str(next(model.parameters()).dtype),
-        "gpu_name": torch.cuda.get_device_name() if cuda else None,
-        "gpu_capability": list(torch.cuda.get_device_capability()) if cuda else None,
         "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated() if cuda else None,
     }
 
@@ -486,12 +467,16 @@ def _validated_args(cli, args):
             cli.error(f"--{name.replace('_', '-')} must be positive")
     model = args.model or (UNSLOTH_MODEL if args.method == "unsloth" else SMOL_MODEL)
     output_dir = args.output_dir or ROOT / "outputs/vision" / args.method
+    if args.evaluate and (output_dir / "evaluation.json").exists():
+        cli.error("evaluation report exists; choose a new --output-dir")
     if not args.evaluate:
         if (Path(model) / "adapter_config.json").is_file():
             cli.error("training an existing adapter is unsupported; select its base model and a new output directory")
-        saved_files = ("config.json", "adapter_config.json", "model.safetensors", "pytorch_model.bin")
-        if any((output_dir / name).is_file() for name in saved_files):
-            cli.error("--output-dir already contains a saved model/adapter; choose a new directory")
+        from finetune_lab.hf_text import _validate_output_dir
+        try:
+            _validate_output_dir(output_dir)
+        except ValueError as error:
+            cli.error(f"--output-dir already contains artifacts or is invalid: {error}")
     learning_rate = args.learning_rate
     if learning_rate is None:
         learning_rate = 2e-5 if args.method == "pytorch" else 2e-4
@@ -516,7 +501,7 @@ def _save_training(args, model, processor, train_rows, validation):
                 "lora_rank": 8 if args.method != "pytorch" else None,
                 "lora_alpha": 16 if args.method != "pytorch" else None,
                 "train_rows": len(train_rows), "validation_rows": len(validation),
-                "data_dir": str(args.data_dir.resolve()), "prompt": INSTRUCTION,
+                "data_dir": project_path(args.data_dir), "prompt": INSTRUCTION,
                 "vision_encoder_frozen": True,
                 "resolved_revision": getattr(model.config, "_commit_hash", None),
                 "dataset_manifest": manifest, "runtime": _runtime_metadata(model)}

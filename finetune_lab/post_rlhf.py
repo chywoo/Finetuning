@@ -1,15 +1,15 @@
-"""Actual reward-model learning and PPO, pinned to TRL 0.24.0 on DGX Spark."""
+"""Actual reward-model learning and PPO, pinned to TRL 0.24.0 on CUDA."""
 from __future__ import annotations
 
 import argparse
 import importlib.metadata
 import json
 import math
-import platform
 from pathlib import Path
 from typing import Any
 
 from finetune_lab.text_encoding import encode_record, format_prompt
+from finetune_lab.post_data import project_path, require_cuda, validate_finite_values
 
 ROOT = Path(__file__).resolve().parents[1]
 TRL_VERSION = "0.24.0"
@@ -31,7 +31,7 @@ def _positive_float(value: str) -> float:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="DGX Spark: trained reward model → PPO policy")
+    parser = argparse.ArgumentParser(description="CUDA: trained reward model → PPO policy")
     parser.add_argument("--stage", choices=("reward", "ppo", "evaluate-reward", "evaluate-policy"), required=True)
     parser.add_argument("--model", default=str(ROOT / "outputs/preference_sft_full"), help="Full SFT policy checkpoint; Instruct model only for stage-isolation experiments")
     parser.add_argument("--revision", default="main")
@@ -107,6 +107,7 @@ def summarize_preferences(gaps: list[float]) -> dict[str, float | int]:
 
 
 def validate_finite_logs(logs: dict[str, Any]) -> None:
+    validate_finite_values(logs)
     for name, value in logs.items():
         if isinstance(value, (int, float)) and not math.isfinite(value):
             raise RuntimeError(f"Nonfinite training metric {name}={value}; checkpoint was not saved")
@@ -118,14 +119,9 @@ def _fresh_output(path: Path) -> None:
 
 
 def _spark_runtime() -> Any:
-    if platform.system() != "Linux" or platform.machine().lower() not in {"aarch64", "arm64"}:
-        raise RuntimeError("Run training/evaluation inside the DGX Spark ARM64 Linux container; --dry-run is dependency-free")
     if importlib.metadata.version("trl") != TRL_VERSION:
-        raise RuntimeError(f"This lesson requires trl=={TRL_VERSION}; use the Spark post-training profile")
-    import torch
-    if not torch.cuda.is_available() or torch.cuda.device_count() != 1 or not torch.cuda.is_bf16_supported():
-        raise RuntimeError("Expose one BF16-capable CUDA GPU with CUDA_VISIBLE_DEVICES=0 on DGX Spark")
-    return torch
+        raise RuntimeError(f"This lesson requires trl=={TRL_VERSION}; use the post-training profile")
+    return require_cuda()
 
 
 def _model_path(model: str) -> str:
@@ -178,10 +174,9 @@ def _metadata(args: argparse.Namespace, torch: Any, **extra: Any) -> dict[str, A
                   else require_reward_checkpoint(args.reward_model).get("base_model"))
     return {"stage": args.stage, "base_model": base_model, "requested_revision": args.revision,
             "prompt_format": "instruction_response_v1", "seed": args.seed,
-            "data_dir": str(args.data_dir.resolve()), "dataset": dataset_manifest(args.data_dir),
+            "data_dir": project_path(args.data_dir), "dataset": dataset_manifest(args.data_dir),
             "reward_model": str(args.reward_model.resolve()) if args.reward_model is not None else None,
-            "runtime": {"machine": platform.machine(), "torch": torch.__version__, "cuda": torch.version.cuda,
-                        "gpu": torch.cuda.get_device_name(0),
+            "runtime": {"torch": torch.__version__, "cuda": torch.version.cuda,
                         "packages": {name: importlib.metadata.version(name) for name in ("trl", "transformers", "datasets", "accelerate")}},
             **extra}
 
@@ -386,15 +381,17 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     from finetune_lab.post_data import read_preferences
     rows = read_preferences(args.data_dir)
+    if args.stage == "ppo":
+        validate_ppo_batch(len(rows["train"]), args.batch_size, args.gradient_accumulation, args.total_episodes)
+    if args.dry_run:
+        print(json.dumps({"stage": args.stage, "status": "schema_validated",
+                          "model_prerequisites_checked": False,
+                          "samples": {name: len(records) for name, records in rows.items()}}, ensure_ascii=False))
+        return
     if args.stage != "evaluate-reward":
         _model_path(args.model)
     if args.reward_model is not None:
         require_reward_checkpoint(args.reward_model)
-    if args.stage == "ppo":
-        validate_ppo_batch(len(rows["train"]), args.batch_size, args.gradient_accumulation, args.total_episodes)
-    if args.dry_run:
-        print(json.dumps({"stage": args.stage, "status": "schema_validated", "samples": {name: len(records) for name, records in rows.items()}}, ensure_ascii=False))
-        return
     _fresh_output(args.output_dir)
     torch = _spark_runtime()
     if args.stage == "reward":
@@ -403,7 +400,7 @@ def main(argv: list[str] | None = None) -> None:
         _train_ppo(args, rows, torch)
     else:
         _evaluate(args, rows, torch)
-    print(f"Saved: {args.output_dir.resolve()}")
+    print(f"Saved: {project_path(args.output_dir)}")
 
 
 if __name__ == "__main__":

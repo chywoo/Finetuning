@@ -1,4 +1,4 @@
-"""Pure post-training data/reward tests; execute on DGX Spark, not the Mac host."""
+"""Pure post-training data/reward tests; no model training or downloads."""
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory

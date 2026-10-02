@@ -223,6 +223,8 @@ __marimo__/
 # Project specific
 outputs/
 .venv-spark-*/
+.venv-lab/
+.venv-lab-*/
 *.log
 runs/
 wandb/

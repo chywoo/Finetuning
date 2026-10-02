@@ -1,4 +1,4 @@
-"""Verifiable arithmetic rewards + GRPO LoRA; pinned TRL, single Spark CUDA GPU."""
+"""Verifiable arithmetic rewards + GRPO LoRA; pinned TRL and CUDA runtime."""
 import argparse
 import json
 import math
@@ -7,7 +7,7 @@ from pathlib import Path
 from finetune_lab.post_data import (
     ROOT, arithmetic_reward, check_trl_version, dataset_manifest, group_statistics,
     parse_integer_completion, read_math, require_cuda, require_fresh_output,
-    require_full_checkpoint, validate_finite_values, validate_grpo_settings, write_report,
+    require_full_checkpoint, validate_finite_values, validate_grpo_settings, write_report, project_path,
 )
 from finetune_lab.text_encoding import format_prompt
 
@@ -160,7 +160,7 @@ def train(args, splits):
     write_report(args.output_dir / "training_metadata.json", metadata)
     write_report(args.output_dir / "metrics.json", metrics)
     write_report(args.output_dir / "validation.json", validation)
-    print(json.dumps({"output_dir": str(args.output_dir), "validation_accuracy": validation["exact_accuracy"]}, indent=2))
+    print(json.dumps({"output_dir": project_path(args.output_dir), "validation_accuracy": validation["exact_accuracy"]}, indent=2))
 
 
 def evaluate(args, splits):
@@ -169,7 +169,7 @@ def evaluate(args, splits):
     from transformers import set_seed
     set_seed(args.seed)
     model, tokenizer, metadata = load_text_model(args.model, args.revision, torch.device("cuda"))
-    result = {"model": args.model, "split": args.split, "training_metadata": metadata,
+    result = {"model": project_path(args.model), "split": args.split, "training_metadata": metadata,
               "num_generations": args.num_generations, "temperature": args.temperature,
               **evaluate_rows(model, tokenizer, splits[args.split], args)}
     write_report(args.output, result)

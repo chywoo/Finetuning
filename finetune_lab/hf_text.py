@@ -12,6 +12,7 @@ import platform
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from finetune_lab.paths import project_path
 
 ROOT = Path(__file__).resolve().parents[1]
 PROMPT_FORMAT = "instruction_response_v1"
@@ -248,12 +249,10 @@ def _train(args: argparse.Namespace, rows: dict[str, list[dict[str, Any]]]) -> d
                 "prompt_format": PROMPT_FORMAT if args.kind == "sft" else "plain_text",
                 "method": args.method, "framework": "huggingface", "max_length": args.max_length,
                 "seed": args.seed, "max_steps": args.max_steps,
-                "source_adapter": spec.adapter_path, "data_dir": str(args.data_dir.resolve()),
+                "source_adapter": spec.adapter_path, "data_dir": project_path(args.data_dir),
                 "samples": {split: len(records) for split, records in rows.items()}, "metrics": metrics,
-                "runtime": {"device": device, "machine": platform.machine(),
+                "runtime": {"device": device,
                             "python": platform.python_version(), "cuda": torch.version.cuda,
-                            "gpu_name": torch.cuda.get_device_name(0) if device == "cuda" else None,
-                            "gpu_capability": list(torch.cuda.get_device_capability(0)) if device == "cuda" else None,
                             "packages": _package_versions()}}
     (args.output_dir / "training_metadata.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
@@ -276,7 +275,7 @@ def main(task: str = "instruction", argv: list[str] | None = None) -> None:
                           "samples": {split: len(records) for split, records in rows.items()}}, ensure_ascii=False))
         return
     metadata = _train(args, rows)
-    print(json.dumps({"output_dir": str(args.output_dir.resolve()), "metrics": metadata["metrics"]}, ensure_ascii=False))
+    print(json.dumps({"output_dir": project_path(args.output_dir), "metrics": metadata["metrics"]}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

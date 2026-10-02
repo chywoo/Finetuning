@@ -1,0 +1,11 @@
+# Portable HF lesson dependencies. Install a platform-appropriate PyTorch first.
+# Do not replace a working CUDA torch/torchvision/Triton runtime with this overlay.
+transformers==4.57.6
+datasets==4.3.0
+peft==0.18.1
+accelerate==1.12.0
+huggingface-hub==0.36.2
+pillow==11.3.0
+sentencepiece>=0.2,<0.3
+pytest==9.1.1
+pytest-cov==7.1.0
