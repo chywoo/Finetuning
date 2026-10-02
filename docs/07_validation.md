@@ -4,7 +4,32 @@
 
 새 post-training 범위는 [실습 계획](11_curriculum.md)과 [체크리스트](10_practice_checklist.md)의 P1–P4를 따른다. Domain은 기존 HF CPT/QA 경로를 재사용한다. DPO/Reward/PPO/GRPO는 post overlay에서 각각 학습·저장·별도 재로딩·독립 평가를 실행해야 하며, 아래 기존 HF/Unsloth matrix에 포함된 것으로 표시하지 않는다.
 
-코드·데이터·상세 설명과 Spark 실행 스크립트를 작성했습니다. 실제 공개 데이터 Dolly/SciQ/Beans subset을 다운로드하고 manifest를 저장했습니다. 사용자 지시 이후 **Intel Mac의 학습·환경 검증을 중단했습니다.** 최신 Spark/AMP/의존성 조합에 대한 GPU 실행은 아직 수행하지 않았습니다.
+사용자 지시로 환경 준비 검토와 짧은 동작 검사를 재개했습니다. 모델 학습과 오래 걸리는 작업은 실행하지 않습니다. 이전에 공개 데이터 subset과 manifest를 준비한 이력이 있지만, 현재 작업 공간의 `data/processed/`는 확인되지 않았습니다. 기존 준비 집계를 현재 데이터 가용성으로 해석하지 않습니다.
+
+### 0단계 환경 검사 결과 — 2026-10-02 10:58 EDT
+
+프로젝트 루트의 `.venv/bin/python`으로 오프라인·제한시간 내 검사했습니다. 내부 장비 식별 정보와 절대 경로는 기록하지 않습니다.
+
+| 검사 | 결과 |
+|---|---|
+| Python 요구 범위 `>=3.11,<3.13` | 기존 가상환경 충족; 기본 shell Python은 범위 밖이므로 `.venv/bin/python` 사용 |
+| PyTorch / Transformers import | 성공 (`2.14.1` / `5.18.0`) |
+| HF 주요 클래스 import | `AutoModelForCausalLM`, `AutoTokenizer`, `GPT2LMHeadModel`, `Trainer`, `TrainingArguments` 성공 |
+| 작은 CPU/CUDA tensor 연산 | 성공; CUDA에서는 2×2 행렬곱 결과와 동기화 확인 |
+| 전체 실습 의존성 | `datasets`, `peft`, `accelerate`, `trl`, `pytest`, `pytest-cov` 미설치 |
+| I1 최초 demo / 실제 데이터 dry-run | 각각 종료 코드 2; 입력 파일 부재 |
+| instruction demo 생성 후 I1 dry-run | 종료 코드 0; train/validation/test 24/8/8, schema와 split 검증 |
+| 전체 학습·저장·재로딩, BF16/AMP, LoRA/QLoRA, post-training, coverage | 미확인 |
+
+재현 명령은 프로젝트 루트에서 실행합니다. 생성 명령은 기존 JSONL이 있으면 덮어쓰지 않고 실패합니다.
+
+```bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 timeout 15 .venv/bin/python -m finetune_lab.prepare_data --task instruction --source demo --output-root data/demo
+.venv/bin/python 01_instruction/pytorch/train.py --data-dir data/demo/instruction --dry-run
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 timeout 45 .venv/bin/python -c 'import torch; x = torch.tensor([[1., 2.], [3., 4.]], device="cuda"); y = x @ x.T; torch.cuda.synchronize(); assert torch.equal(y.cpu(), torch.tensor([[5., 11.], [11., 25.]]))'
+```
+
+현재 패키지 버전은 `requirements/spark-hf.txt`의 고정 조합과 다릅니다. import 성공만으로 기존 Trainer/PEFT/TRL API 호환성을 확인한 것으로 표시하지 않습니다. 다음 작업은 사용할 profile의 의존성 조합을 검토하고 누락 패키지와 실제 데이터를 준비하는 것입니다. 이번에는 설치·다운로드·학습·pytest를 실행하지 않았습니다.
 
 지시 이전의 일부 작은 CPU 파이프라인 실행은 Spark의 ARM64 CUDA·Triton·bitsandbytes 호환성을 증명하지 않습니다. 결과를 Spark 성능 비교로 사용하지 않습니다. 변경 전 unit tests가 통과했더라도 최신 코드의 GPU 성공을 주장하지 않습니다.
 

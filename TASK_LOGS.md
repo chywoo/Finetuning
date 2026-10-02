@@ -258,3 +258,17 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - 작업 위치 표기를 특정 내부 절대 경로 대신 `프로젝트 루트`로 정정했다.
 - 기존 기록의 민감정보 점검 문구를 일반화했으며, 내부 장비 식별 정보나 비밀 값은 기록하지 않는다.
 - 이번 작업은 skill 설치와 문서 기록 정비만 포함하며, 구현·테스트·다운로드·학습은 실행하지 않았다.
+
+### 2026-10-02 11:00:14 EDT — 0단계 / I1 환경·데이터 진입 검사
+
+- 사용자 지시로 작업을 재개했다. 이번 범위는 환경 검토와 짧은 동작 검사이며 모델 학습과 오래 걸리는 작업은 제외한다.
+- `AGENTS.md`, 진행 기록, 체크리스트, 커리큘럼, Graft INDEX와 코드 지도를 읽고 첫 미완료 단계인 공통 환경 준비를 진행했다. 설치된 `codebase-onboarding`, `mle-workflow`의 탐색·재현성·근거 구분 지침을 적용했다.
+- 프로젝트 루트의 `.venv/bin/python`은 프로젝트 Python 요구 범위를 충족했다. 기본 shell Python은 범위 밖이므로 검사에 사용하지 않았다. PyTorch 2.14.1과 Transformers 5.18.0 import, HF 주요 클래스 import, 작은 CPU tensor 연산과 CUDA 2×2 행렬곱·동기화가 성공했다. 제한시간은 45초이며 모델을 생성하거나 학습하지 않았다.
+- `datasets`, `peft`, `accelerate`, `trl`, `pytest`, `pytest-cov`는 미설치다. 현재 패키지와 기존 고정 profile 조합도 다르므로 전체 환경 준비와 API 호환성을 완료로 표시하지 않는다. 사용자 변경 중인 `pyproject.toml`과 `AGENTS.md`를 보존했다.
+- 최초 I1 dry-run은 `data/demo/instruction/`과 `data/processed/instruction/` 입력 부재로 각각 종료 코드 2였다. 현재 작업 공간에는 기존 `data/`가 없었으며, 이전 다운로드 이력을 현재 데이터 가용성과 구분했다.
+- 실행: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 timeout 15 .venv/bin/python -m finetune_lab.prepare_data --task instruction --source demo --output-root data/demo`. 기존 스크립트로 자체 작성 fixture 24/8/8과 manifest를 생성했다. 다운로드·덮어쓰기는 없었다.
+- 실행: `.venv/bin/python 01_instruction/pytorch/train.py --data-dir data/demo/instruction --dry-run`. 종료 코드 0, schema/split 검사 성공. 생성 데이터는 기존 Git ignore 대상이며 commit에 넣지 않는다.
+- 문서 갱신: README·커리큘럼·체크리스트의 중단 안내를 현재 범위로 변경하고, 검증 문서에 결과·실패·재현 명령·미확인 항목을 기록했다. 프로젝트가 특정 장비만을 위한 것이라고 표현하지 않으며 내부 장비 식별 정보·절대 경로·비밀 값은 기록하지 않았다.
+- 확인 근거: 체크리스트 case ID 34개·중복 없음, 생성 manifest SHA256 일치, 변경 문서의 로컬 링크 정상, `git diff --check` 통과.
+- 체크 갱신: 0단계 짧은 환경 검사와 I1 demo 진입 검사만 완료. 기존 작성·준비 이력 34/34, 실제 실습 완료 0/34, 추가 과제 0/11 유지. 전체 coverage·BF16/AMP·학습·저장·재로딩은 미확인이다.
+- 남은 일: 사용할 profile의 의존성 조합 검토, 누락 패키지와 실제 데이터 준비. 이번에 학습·설치·다운로드·pytest·원격 작업은 실행하지 않았다. 문서 변경을 `docs: record resumed environment readiness checks`로 local commit한다.

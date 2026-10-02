@@ -1,8 +1,8 @@
 # 전체 실습과 진행 체크리스트
 
-**현재 모드: 추가 구현 중단, 계획·문서 정리만 진행.** 이미 작성된 결과는 준비 현황으로 유지하며, 새로운 구현이나 Spark 실행 완료로 체크하지 않습니다. 주요 작업 단위 후 local Git commit과 시간별 로그를 남깁니다.
+**현재 모드: 작업 재개, 환경 준비 검토와 짧은 동작 검사.** 모델 학습과 오래 걸리는 작업은 실행하지 않습니다. 주요 작업 단위 후 local Git commit과 시간별 로그를 남깁니다.
 
-기준 시각: 2026-10-02 06:33 EDT (America/Toronto, UTC−04:00).
+환경 검사 기준 시각: 2026-10-02 10:58 EDT (America/Toronto, UTC−04:00). 기존 준비 집계는 06:33의 작성·데이터 준비 이력이다.
 
 **기존 30개와 post-training 4개를 합해 기본 실습 34개를 관리한다. Spark에서 완료한 실습은 0/34개다.** [단계별 학습 계획](11_curriculum.md)을 따라 대표 실습을 하나씩 진행한 뒤 나머지 선택 조합으로 확장한다. 구현 준비와 실제 수행 체크를 구분한다. 시간별 변경 이력은 [TASK_LOGS.md](../TASK_LOGS.md)에 누적한다.
 
@@ -45,6 +45,13 @@ PyTorch는 직접 작성한 loop를 뜻하며 모델 로딩에는 HF를 사용�
 
 ## 공통 선행 작업
 
+현재 작업 공간에서는 기존 `data/processed/`와 나머지 demo 데이터가 확인되지 않았다. 아래 기존 준비 체크와 34/34 집계는 이전 작성·준비 이력이며, 현재 즉시 실행 가능한 케이스 수를 뜻하지 않는다. 이번에 `data/demo/instruction/`만 오프라인 생성했다. 실제 데이터 준비와 설치는 미완료다.
+
+- [x] 0단계: 기존 가상환경의 주요 import와 작은 CPU/CUDA tensor 연산 검사.
+- [x] I1 진입 검사: instruction demo 24/8/8 생성 및 `--dry-run` 성공.
+- [ ] 전체 실습 의존성 준비: `datasets`, `peft`, `accelerate`, `trl`, `pytest`, `pytest-cov` 미설치.
+- [ ] 현재 작업 공간의 실제 데이터·manifest 준비: `data/processed/` 미확인.
+
 - [x] 대상 × 도구별 9개 디렉토리와 README/train.py 작성.
 - [x] Dolly instruction 256/32/32, SciQ CPT 232/29/31, QA 255/32/32 준비.
 - [x] Beans RGB 이미지와 분할 96/24/24, demo fixture 및 manifest 준비.
@@ -60,7 +67,7 @@ PyTorch는 직접 작성한 loop를 뜻하며 모델 로딩에는 HF를 사용�
 - [ ] Spark에서 선택적 vision 통합 검증 성공.
 - [ ] 최신 test suite와 coverage 80% gate 통과.
 
-설치는 [DGX Spark 안내](04_dgx_spark.md), 실행 검증은 [검증 상태](07_validation.md)를 따른다. Intel Mac 환경 검증은 중단 상태다.
+짧은 환경 검사 결과와 다음 준비 항목은 [검증 상태](07_validation.md)를 따른다. Spark profile을 사용하는 경우 설치는 [DGX Spark 안내](04_dgx_spark.md)를 따른다.
 
 ## Instruction SFT: I1–I7
 
@@ -446,7 +453,7 @@ PyTorch는 직접 작성한 loop를 뜻하며 모델 로딩에는 HF를 사용�
 
 ## 현재 집계
 
-| 실습군 | 준비 | Spark 실습 완료 |
+| 실습군 | 기존 작성·준비 이력 | Spark 실습 완료 |
 |---|---|---|
 | Instruction | 7/7 | 0/7 |
 | CPT | 7/7 | 0/7 |

@@ -1,6 +1,6 @@
 # Fine-tuning 학습 실습실
 
-현재는 사용자 지시에 따라 **추가 구현을 중단하고 계획·문서 정리만 진행**합니다. 아래 코드는 중단 전에 작성된 상태이며 Spark 실행은 미확인입니다. 주요 작업 완료 시 local Git commit을 남기고 [TASK_LOGS.md](TASK_LOGS.md)에 시각별로 기록합니다.
+사용자 지시로 작업을 재개했습니다. 현재 범위는 환경 준비 검토와 짧은 동작 검사이며, 모델 학습과 오래 걸리는 작업은 실행하지 않습니다. 확인한 결과와 미확인 범위는 [검증 상태](docs/07_validation.md)에 구분하고, 주요 작업 완료 시 local Git commit과 [TASK_LOGS.md](TASK_LOGS.md) 기록을 남깁니다.
 
 **LLM이 답하는 법을 배우는 SFT부터, 도메인 적응·선호 학습 DPO·RLHF PPO·검산 보상 RLVR GRPO와 VLM 이미지 적응까지 순서대로 실습합니다.** 설명은 한국어이고, 작은 모델과 영어 공개 데이터로 계산 비용을 줄였습니다. 영어 중심 모델의 실험 결과를 한국어 능력 향상으로 해석하지 않습니다.
 
@@ -61,7 +61,7 @@ python scripts/doctor.py --require-spark
 
 ## DGX Spark에서 바로 시작하기
 
-실제 학습 환경은 **DGX Spark의 ARM64 Linux·Blackwell CUDA**입니다. [Spark 설치 안내](docs/04_dgx_spark.md)를 먼저 읽습니다. 아래 첫 명령은 Spark 호스트의 저장소 루트에서, 나머지는 컨테이너 내부에서 실행합니다.
+DGX Spark를 사용하는 경우 [Spark 설치 안내](docs/04_dgx_spark.md)를 먼저 읽습니다. 아래 첫 명령은 Spark 호스트의 저장소 루트에서, 나머지는 컨테이너 내부에서 실행합니다. 다른 환경에서는 Python·라이브러리·장치 지원을 먼저 확인합니다.
 
 ```bash
 bash scripts/spark_container.sh hf
@@ -110,6 +110,6 @@ python scripts/validate_spark.py --profile hf --include-vision
 RUN_ML_TESTS=1 python -m pytest --cov=finetune_lab --cov-report=term-missing --cov-fail-under=80
 ```
 
-[검증 안내](docs/07_validation.md)에 Spark에서 실행할 검사와 아직 확인하지 않은 범위를 정리했습니다. 사용자 요청에 따라 Intel Mac 환경 검증은 중단했고, 최신 Spark 구성의 CUDA 실행과 coverage 80% 통과를 주장하지 않습니다. [평가 안내](docs/03_evaluation.md)는 결과 해석, [문제 해결](docs/05_troubleshooting.md)은 OOM·마스킹·환경 오류를 다룹니다. 코드 연결 관계는 [Graft 탐색 안내](docs/09_code_map.md)를 참고합니다.
+[검증 안내](docs/07_validation.md)에 짧은 환경 검사 결과와 아직 확인하지 않은 범위를 정리했습니다. 전체 학습·저장·재로딩 검증과 coverage 80%는 미확인입니다. [평가 안내](docs/03_evaluation.md)는 결과 해석, [문제 해결](docs/05_troubleshooting.md)은 OOM·마스킹·환경 오류를 다룹니다. 코드 연결 관계는 [Graft 탐색 안내](docs/09_code_map.md)를 참고합니다.
 
 원문을 학습해도 정확한 지식 검색을 보장하지 않습니다. 자주 바뀌는 사실이나 출처가 필요한 답변에는 RAG도 비교합니다. [확장 학습](docs/08_next_experiments.md)에 DPO, 한국어 데이터, RAG 비교, 멀티 GPU 확장 과제를 정리했습니다.
