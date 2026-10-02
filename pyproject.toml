@@ -1,0 +1,17 @@
+[project]
+name = "finetune-learning-lab"
+version = "0.1.0"
+description = "한국어 LLM/VLM fine-tuning 실습"
+requires-python = ">=3.11,<3.13"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["integration: small real PyTorch/Trainer training integration"]
+
+[tool.coverage.run]
+source = ["finetune_lab"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true

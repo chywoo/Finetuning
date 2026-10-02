@@ -1,0 +1,2 @@
+# Compatibility alias; install inside NGC using scripts/install_spark.sh.
+-r spark-hf.txt

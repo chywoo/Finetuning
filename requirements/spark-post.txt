@@ -1,0 +1,3 @@
+-r spark-hf.txt
+# One HF/TRL route for DPO, reward modeling/PPO, and RLVR GRPO.
+trl==0.24.0
