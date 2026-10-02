@@ -2,7 +2,7 @@
 
 **현재 모드: 작업 재개, 환경 준비 검토와 짧은 동작 검사.** 모델 학습과 오래 걸리는 작업은 실행하지 않습니다. 주요 작업 단위 후 local Git commit과 시간별 로그를 남깁니다.
 
-환경 검사 기준 시각: 2026-10-02 10:58 EDT (America/Toronto, UTC−04:00). 기존 준비 집계는 06:33의 작성·데이터 준비 이력이다.
+환경 검사 기준 시각: 2026-10-02 10:58 EDT, 데이터 재검사: 11:02 EDT (America/Toronto, UTC−04:00). 기존 준비 집계는 06:33의 작성·데이터 준비 이력이다.
 
 **기존 30개와 post-training 4개를 합해 기본 실습 34개를 관리한다. Spark에서 완료한 실습은 0/34개다.** [단계별 학습 계획](11_curriculum.md)을 따라 대표 실습을 하나씩 진행한 뒤 나머지 선택 조합으로 확장한다. 구현 준비와 실제 수행 체크를 구분한다. 시간별 변경 이력은 [TASK_LOGS.md](../TASK_LOGS.md)에 누적한다.
 
@@ -45,12 +45,13 @@ PyTorch는 직접 작성한 loop를 뜻하며 모델 로딩에는 HF를 사용�
 
 ## 공통 선행 작업
 
-현재 작업 공간에서는 기존 `data/processed/`와 나머지 demo 데이터가 확인되지 않았다. 아래 기존 준비 체크와 34/34 집계는 이전 작성·준비 이력이며, 현재 즉시 실행 가능한 케이스 수를 뜻하지 않는다. 이번에 `data/demo/instruction/`만 오프라인 생성했다. 실제 데이터 준비와 설치는 미완료다.
+사용자가 복사한 `data/demo/`와 `data/processed/`를 재검사했다. Manifest 10개, JSONL 36개의 건수·SHA256과 schema·split 검사가 통과했고 이미지 파일 168개의 존재와 파일 hash 중복 없음을 확인했다. 아래 34/34 집계는 작성·준비 이력이며, 전체 의존성과 학습 실행 검증은 아직 미완료다.
 
 - [x] 0단계: 기존 가상환경의 주요 import와 작은 CPU/CUDA tensor 연산 검사.
 - [x] I1 진입 검사: instruction demo 24/8/8 생성 및 `--dry-run` 성공.
+- [x] I1 실제 데이터 진입 검사: instruction 256/32/32 `--dry-run` 성공.
 - [ ] 전체 실습 의존성 준비: `datasets`, `peft`, `accelerate`, `trl`, `pytest`, `pytest-cov` 미설치.
-- [ ] 현재 작업 공간의 실제 데이터·manifest 준비: `data/processed/` 미확인.
+- [x] 현재 작업 공간의 실제 데이터·manifest 준비: 복사된 `data/processed/`의 건수·SHA256·schema·split 확인.
 
 - [x] 대상 × 도구별 9개 디렉토리와 README/train.py 작성.
 - [x] Dolly instruction 256/32/32, SciQ CPT 232/29/31, QA 255/32/32 준비.

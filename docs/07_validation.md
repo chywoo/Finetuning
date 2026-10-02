@@ -4,7 +4,7 @@
 
 새 post-training 범위는 [실습 계획](11_curriculum.md)과 [체크리스트](10_practice_checklist.md)의 P1–P4를 따른다. Domain은 기존 HF CPT/QA 경로를 재사용한다. DPO/Reward/PPO/GRPO는 post overlay에서 각각 학습·저장·별도 재로딩·독립 평가를 실행해야 하며, 아래 기존 HF/Unsloth matrix에 포함된 것으로 표시하지 않는다.
 
-사용자 지시로 환경 준비 검토와 짧은 동작 검사를 재개했습니다. 모델 학습과 오래 걸리는 작업은 실행하지 않습니다. 이전에 공개 데이터 subset과 manifest를 준비한 이력이 있지만, 현재 작업 공간의 `data/processed/`는 확인되지 않았습니다. 기존 준비 집계를 현재 데이터 가용성으로 해석하지 않습니다.
+사용자 지시로 환경 준비 검토와 짧은 동작 검사를 재개했습니다. 모델 학습과 오래 걸리는 작업은 실행하지 않습니다. 최초 검사에서 없었던 `data/processed/`와 demo 데이터를 사용자가 복사했으며, 아래 재검사로 현재 데이터 가용성을 확인했습니다. 전체 의존성과 학습 실행 검증은 아직 미완료입니다.
 
 ### 0단계 환경 검사 결과 — 2026-10-02 10:58 EDT
 
@@ -29,7 +29,22 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 timeout 15 .venv/bin/python -m finetune_
 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 timeout 45 .venv/bin/python -c 'import torch; x = torch.tensor([[1., 2.], [3., 4.]], device="cuda"); y = x @ x.T; torch.cuda.synchronize(); assert torch.equal(y.cpu(), torch.tensor([[5., 11.], [11., 25.]]))'
 ```
 
-현재 패키지 버전은 `requirements/spark-hf.txt`의 고정 조합과 다릅니다. import 성공만으로 기존 Trainer/PEFT/TRL API 호환성을 확인한 것으로 표시하지 않습니다. 다음 작업은 사용할 profile의 의존성 조합을 검토하고 누락 패키지와 실제 데이터를 준비하는 것입니다. 이번에는 설치·다운로드·학습·pytest를 실행하지 않았습니다.
+현재 패키지 버전은 `requirements/spark-hf.txt`의 고정 조합과 다릅니다. import 성공만으로 기존 Trainer/PEFT/TRL API 호환성을 확인한 것으로 표시하지 않습니다. 다음 작업은 사용할 profile의 의존성 조합을 검토하고 누락 패키지를 준비하는 것입니다. 이번에는 설치·다운로드·학습·pytest를 실행하지 않았습니다.
+
+### 복사된 데이터 재검사 — 2026-10-02 11:02 EDT
+
+- I1 demo dry-run: 종료 코드 0, train/validation/test 24/8/8.
+- 실패했던 I1 실제 데이터 dry-run: 종료 코드 0, train/validation/test 256/32/32. 입력 부재 문제는 해결됐다.
+- `data/demo/`, `data/processed/`의 manifest 10개와 nested SFT를 포함한 데이터 묶음 12개를 확인했다. JSONL 36개의 건수·SHA256, 기존 공통 검증 함수의 schema·split 검사와 post-training 선호/산술 계약 검사가 통과했다.
+- 실제 CPT 232/29/31, QA SFT 255/32/32, vision 96/24/24도 manifest와 일치했다.
+- demo/실제 vision 이미지 총 168개의 파일 존재, 데이터 폴더 안의 경로, 각 데이터 묶음 내 파일 SHA256 중복 없음을 확인했다. 이미지 decoding·RGB pixel hash·VLM processor 실행은 검사하지 않았다.
+- 복사된 파일을 수정하거나 덮어쓰지 않았다. 데이터 검사 성공은 학습·성능·coverage 성공을 뜻하지 않는다.
+
+실패했던 명령의 재현:
+
+```bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 timeout 15 .venv/bin/python 01_instruction/pytorch/train.py --data-dir data/processed/instruction --dry-run
+```
 
 지시 이전의 일부 작은 CPU 파이프라인 실행은 Spark의 ARM64 CUDA·Triton·bitsandbytes 호환성을 증명하지 않습니다. 결과를 Spark 성능 비교로 사용하지 않습니다. 변경 전 unit tests가 통과했더라도 최신 코드의 GPU 성공을 주장하지 않습니다.
 

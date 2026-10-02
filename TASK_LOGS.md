@@ -272,3 +272,14 @@ python scripts/validate_spark.py --profile unsloth --include-vision
 - 확인 근거: 체크리스트 case ID 34개·중복 없음, 생성 manifest SHA256 일치, 변경 문서의 로컬 링크 정상, `git diff --check` 통과.
 - 체크 갱신: 0단계 짧은 환경 검사와 I1 demo 진입 검사만 완료. 기존 작성·준비 이력 34/34, 실제 실습 완료 0/34, 추가 과제 0/11 유지. 전체 coverage·BF16/AMP·학습·저장·재로딩은 미확인이다.
 - 남은 일: 사용할 profile의 의존성 조합 검토, 누락 패키지와 실제 데이터 준비. 이번에 학습·설치·다운로드·pytest·원격 작업은 실행하지 않았다. 문서 변경을 `docs: record resumed environment readiness checks`로 local commit한다.
+
+### 2026-10-02 11:02:50 EDT — I1 / 복사된 데이터 재검사
+
+- 사용자가 복사한 데이터를 대상으로 이전 입력 부재 실패를 재확인했다. 기존 `mle-workflow`의 데이터 계약·재현성 지침을 적용하고 프로젝트 루트 기준 경로만 기록한다.
+- `.venv/bin/python 01_instruction/pytorch/train.py --data-dir data/demo/instruction --dry-run`: 종료 코드 0, train/validation/test 24/8/8.
+- `.venv/bin/python 01_instruction/pytorch/train.py --data-dir data/processed/instruction --dry-run`: 종료 코드 0, 256/32/32. 이전 종료 코드 2의 입력 부재 문제는 해결됐다. 두 실행은 오프라인 환경 변수와 30초 전체 제한시간 내 subprocess별 10초 제한으로 검사했다.
+- 복사된 manifest 10개, nested SFT 포함 데이터 묶음 12개, JSONL 36개의 건수·SHA256 일치를 확인했다. 공통 데이터 및 post-training 검증 함수로 schema와 split 계약을 확인했다. 실제 CPT 232/29/31, QA SFT 255/32/32, vision 96/24/24도 기존 기록과 일치했다.
+- demo/실제 vision 이미지 168개의 파일 존재·데이터 폴더 내부 경로·각 묶음 내 파일 SHA256 중복 없음을 확인했다. 이미지 decoding·RGB pixel hash·VLM processor 동작은 이번 검사 범위에 포함하지 않았다.
+- 복사된 데이터는 변경하지 않았다. 학습·다운로드·설치·pytest는 실행하지 않았다. 누락 라이브러리와 전체 환경 준비, 학습·저장·재로딩·coverage는 기존 미확인 상태를 유지한다.
+- 체크리스트의 현재 데이터·manifest 준비와 I1 실제 데이터 진입 검사를 완료로 갱신하고 검증 문서에 재검사 근거를 추가했다. 실습 완료 집계는 0/34, 추가 과제는 0/11로 유지한다.
+- 이번 문서 변경만 `docs: verify copied practice datasets`로 local commit한다. 사용자 변경과 기존 데이터는 보존한다.
