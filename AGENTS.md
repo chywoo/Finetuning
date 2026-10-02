@@ -1,13 +1,9 @@
 # Repository agent guide
 
 ## 목적과 실행 환경
+이 저장소는 한국어로 설명하는 단계별 LLM/VLM fine-tuning 및 LLM post-training 실습실이다. 작은 영어 모델·공개 데이터로 원리를 배우고 실제 학습한다.
 
-**현재 작업 모드: 계획·문서 정리만 진행한다. 사용자가 명시적으로 구현 재개를 지시하기 전에는 실행 코드·테스트 구현을 추가하거나 변경하지 않는다.** 중단 전에 작성된 코드는 현황으로 보존하며, 구현 재개 승인으로 간주하지 않는다. 학습·환경 설치도 실행하지 않는다.
-
-이 저장소는 한국어로 설명하는 단계별 LLM/VLM fine-tuning 및 LLM post-training 실습실이다. 작은 영어 모델·공개 데이터로 원리를 배우고 DGX Spark에서 실제 학습한다.
-
-- 실행 대상: **DGX Spark ARM64 Linux / GB10 CUDA**. Intel Mac의 환경 검사, ML library import, pytest, 학습 실행은 사용자 지시로 중단했다. Mac에서는 소스·문서·데이터의 정적 확인만 한다.
-- CUDA 실행, 품질 향상, coverage 통과는 실제 근거가 있을 때만 완료로 기록한다.
+- 실행, 품질 향상, coverage 통과는 실제 근거가 있을 때만 완료로 기록한다.
 - 커리큘럼: [docs/11_curriculum.md](docs/11_curriculum.md). 전체 케이스/체크: [docs/10_practice_checklist.md](docs/10_practice_checklist.md). 시간별 기록: [TASK_LOGS.md](TASK_LOGS.md).
 - 처음은 고등학생 수준의 직관·작은 계산·용어 설명으로 시작하고, 이후 대학생 수준의 수식·가정·실험 해석으로 확장한다. 실습마다 선수 단계, 시작 파일, 실행 명령, 결과물, 완료 기준, 다음 단계를 제공한다.
 

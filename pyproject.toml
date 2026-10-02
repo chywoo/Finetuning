@@ -3,6 +3,11 @@ name = "finetune-learning-lab"
 version = "0.1.0"
 description = "한국어 LLM/VLM fine-tuning 실습"
 requires-python = ">=3.11,<3.13"
+dependencies = [
+    "huggingface-hub>=1.33.0",
+    "torch>=2.14.1",
+    "transformers>=5.18.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
